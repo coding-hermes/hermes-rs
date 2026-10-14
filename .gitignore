@@ -27,3 +27,5 @@ htmlcov/
 .gitreins/disposable.json
 .gitreins/disposable.lock
 .gitreins/tasks.yaml.lock
+
+dagger.db
