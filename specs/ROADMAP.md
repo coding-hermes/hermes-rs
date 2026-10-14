@@ -2,7 +2,7 @@
 
 ## Current state
 
-The pinned upstream reference and scoped Python harness run are recorded in `UPSTREAM_BASELINE.md`. The board contains HRS-001 through HRS-005 and the dogfood follow-ups. The current resource-profile numbers are preliminary: the capture implementation needs correction before they can justify architecture or performance claims. There is not yet a Rust crate, executable, or Rust test run.
+The pinned upstream reference and scoped Python harness run are recorded in `UPSTREAM_BASELINE.md`. The live board tracks HRS-001 through HRS-009 plus the dogfood findings; `NEVER-DONE` is a fixture, not product work. The current resource-profile numbers are preliminary: the capture implementation needs correction before they can justify architecture or performance claims. There is not yet a Rust crate, executable, or Rust test run.
 
 The finish line is not “a Rust program that passes its own tests.” A supported release must run the upstream Hermes harness against the Python reference and Rust target through an explicit adapter; publish case-level results using the same pinned harness/case IDs and explain every classification; retain SQLite support; prove Python interoperability at a named boundary; and ship tested install, upgrade, backup, migration, and rollback paths.
 
