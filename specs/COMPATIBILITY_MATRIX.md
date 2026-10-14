@@ -2,22 +2,35 @@
 
 This matrix is the source of truth for scope. Each row must name the upstream tag/commit examined, source location, contract fixture, Rust status, Python interoperability requirement, last checked release, and owning task. `Untriaged` means no parity claim is permitted.
 
+Pinned upstream release for all HRS-001 rows: **v0.22.0** @ commit `e06df9c2eae6901f4c88f464e0ae6e753c0428b8` (tag object `84094bd903791c35867605e28e25075baa293adc`, commit dated 2026-10-13, release published 2026-10-14) — see `UPSTREAM_BASELINE.md` for provenance. Source paths below were verified to exist in the pinned tree.
+
 | Surface | Upstream reference | Rust status | Python interop | Contract evidence | Task |
 |---|---|---|---|---|---|
-| CLI and process lifecycle | Untriaged | Untriaged | Untriaged | Pending baseline | HRS-001 |
-| Configuration and environment resolution | Untriaged | Untriaged | Untriaged | Pending baseline | HRS-001 |
-| Agent loop / orchestration | Untriaged | Untriaged | Untriaged | Pending baseline | HRS-001 |
-| Provider and model routing | Untriaged | Untriaged | Untriaged | Pending baseline | HRS-001 |
-| Tools and tool-call protocols | Untriaged | Untriaged | Untriaged | Pending baseline | HRS-001 |
-| MCP integrations | Untriaged | Untriaged | Untriaged | Pending baseline | HRS-001 |
+| CLI and process lifecycle | v0.22.0 @ `e06df9c2`; `cli.py`, `hermes_cli/main.py` (entry point per `[project.scripts]`), `hermes_cli/_parser.py`, `hermes_cli/_launchers.py`, `batch_runner.py` | Pending Rust implementation | Upstream CLI is the Python reference; process behavior (startup, subcommands, exit paths) to be mirrored behind a documented boundary | Documented (source: `cli.py`; `hermes_cli/main.py`) | HRS-001 |
+| Configuration and environment resolution | v0.22.0 @ `e06df9c2`; `hermes_cli/config.py`, `config_defaults.py`, `config_effective.py`, `config_env_routing.py`, `config_migrations.py`, `cli-config.yaml.example`, `.env.example`, `hermes_constants.py` (`get_hermes_home`) | Pending Rust implementation | YAML/env config consumed by the Python reference; Rust reader must resolve the same keys, defaults, and precedence for supported subsets | Documented (source: `hermes_cli/config*.py`; `cli-config.yaml.example`) | HRS-001 |
+| Agent loop / orchestration | v0.22.0 @ `e06df9c2`; `run_agent.py` (`class AIAgent`), `agent/conversation_loop.py` (`run_conversation`), `agent/agent_init.py`, `agent/turn_facade.py`, `agent/context_engine.py`, `agent/context_compressor.py` | Pending Rust implementation | `AIAgent` embeddable API (docstring contract) and conversation-loop callbacks are the Python-facing seam; adapter design pending | Documented (source: `run_agent.py`; `agent/conversation_loop.py`) | HRS-001 |
+| Provider and model routing | v0.22.0 @ `e06df9c2`; `agent/provider_registry.py`, `agent/provider_base.py`, `agent/route_binding.py`, `agent/fallback_cooldown.py`, `agent/credential_pool_model_cooldowns.py`, `agent/model_metadata.py`, `agent/models_dev.py`, `providers/base.py` | Pending Rust implementation | Provider registries are pluggable Python objects; interop requirement is configuration-level (same routing inputs/outputs), not object-level, until HRS-003 categorizes extensions | Documented (source: `agent/provider_registry.py`; `agent/route_binding.py`) | HRS-001 |
+| Tools and tool-call protocols | v0.22.0 @ `e06df9c2`; `toolsets.py` (`_HERMES_CORE_TOOLS`), `agent/tool_executor.py`, `agent/tool_guardrails.py`, `tools/` (per-tool modules incl. `browser_*`, `approval_*`), `acp_adapter/` (ACP; `acp` extra pins `agent-client-protocol==0.9.0`) | Pending Rust implementation | Tool-call wire shapes and toolset names must match; Python tool implementations remain the reference executors | Documented (source: `toolsets.py`; `agent/tool_executor.py`) | HRS-001 |
+| MCP integrations | v0.22.0 @ `e06df9c2`; `mcp_serve.py` (Hermes as MCP server, `hermes mcp serve`), `tools/mcp_tool.py` + `tools/mcp_tool_discovery.py` + `tools/mcp_oauth*.py` (client side), `mcp==2.0.0` pin, `optional-mcps/` | Pending Rust implementation | MCP protocol (stdio/HTTP) is the interop boundary; the pinned `mcp==2.0.0` SDK behavior is the reference for client/server conversations | Documented (source: `mcp_serve.py`; `tools/mcp_tool.py`) | HRS-001 |
+| Gateway / API / streaming contracts | v0.22.0 @ `e06df9c2`; `gateway/run.py`, `gateway/config.py`, `gateway/delivery.py`, `tui_gateway/` (desktop backend), `agent/stream_delivery.py`, `agent/chat_completion_stream_monitor.py`, `hermes_cli/gateway.py` + `hermes_cli/gateway_multiplex_*.py` | Pending Rust implementation | Gateway wire protocols (messaging channels, SSE/streaming delivery) are Python-served today; Rust gateway must speak the same protocols per profile/channel | Documented (source: `gateway/run.py`; `agent/stream_delivery.py`) | HRS-001 |
+| Memory / session / history semantics | v0.22.0 @ `e06df9c2`; `hermes_state.py` + `hermes_state_*.py` (SQLite state store: sessions, messages, FTS5 search, WAL, `parent_session_id` compression chains), `agent/memory_manager.py`, `agent/memory_provider.py`, `agent/compaction_*.py` | Pending Rust implementation | SQLite file format + schema is the compatibility baseline (contract §1); Rust persistence sits behind the backend shim and must read/write supported schemas | Documented (source: `hermes_state.py`; `agent/memory_manager.py`) | HRS-001 |
+| Upstream test framework and comparative scoring | v0.22.0 @ `e06df9c2` (harness SHA = source SHA); pytest `9.1.1` + `pytest-asyncio 1.3.0`; config `[tool.pytest.ini_options]` (`pyproject.toml` line 691, `addopts = "-m 'not integration and not live'"`); canonical runner `scripts/run_tests.sh` (per-file isolation, `TZ=UTC LANG=C.UTF-8 PYTHONHASHSEED=0`); 5,724 test files under `tests/` (largest: `tests/hermes_cli/` 1,540, `tests/gateway/` 1,017, `tests/agent/` 996) | Untriaged | Run commands: `scripts/run_tests.sh` (CI-parity) or `python -m pytest tests/ -x -q` (default set) against the pinned Python reference; Rust target adapter required before any comparative score (AC-2/AC-9) | Documented (source: `scripts/run_tests.sh`; `pyproject.toml`; `tests/conftest.py`); full inventory in `UPSTREAM_BASELINE.md` §2 | HRS-001 |
 | Persistence and database access | Upstream baseline pending; retain SQLite | Untriaged | Untriaged | Compare stock SQLite and optional Turso; PostgreSQL optional, migration round-trips required | HRS-002 |
 | Python libraries / extensions | Untriaged | Untriaged | Must be categorized | Adapter proof pending | HRS-003 |
-| Gateway / API / streaming contracts | Untriaged | Untriaged | Untriaged | Pending baseline | HRS-001 |
-| Memory / session / history semantics | Untriaged | Untriaged | Untriaged | Pending baseline | HRS-001 |
-| Upstream test framework and comparative scoring | Latest upstream harness not yet inventoried | Untriaged | Python reference + Rust target adapter required | Run the same upstream harness/case set against both; publish per-case and aggregate score delta | HRS-001 |
 | Install, upgrade, and release behavior | Untriaged | Untriaged | Untriaged | Pending baseline | HRS-004 |
 | Observability, limits, and resource controls | Untriaged | Untriaged | Untriaged | Baseline benchmark pending | HRS-002 |
 
 ## Update rule
 
 For each upstream release, record the tag/commit and review changed files, APIs, configuration, and tests. Add/adjust rows and tasks before claiming the release is tracked. Do not convert an unknown row to supported without a fixture or an explicit, reviewed exclusion.
+
+## Upstream baseline (HRS-001)
+
+Pinned upstream release **v0.22.0** ("The Threshold Release"), commit `e06df9c2eae6901f4c88f464e0ae6e753c0428b8`, commit dated 2026-10-13, release published 2026-10-14. Full provenance, harness inventory, workload profiles, and release-notes summary live in [`UPSTREAM_BASELINE.md`](UPSTREAM_BASELINE.md). Summary:
+
+- **Pin method:** GitHub API `releases/latest` (newest non-draft, non-prerelease release) → `git ls-remote` tag-object and peeled commit SHAs → shallow clone at the tag, HEAD verified equal to the peeled commit.
+- **Harness:** pytest 9.1.1; run via `scripts/run_tests.sh` (CI-parity, per-file isolation) or `python -m pytest tests/ -x -q`; harness revision = the pin SHA.
+- **Workload profiles:** `single_session` and `multi_session` defined in `UPSTREAM_BASELINE.md` §4; hardware/OS/runtime metadata recorded (AMD Ryzen 7 7840HS, 16 CPUs, Ubuntu 26.04.1, CPython 3.11.15); all measurement values pending.
+- **Baseline capture:** `scripts/capture_baseline.py --profile {single_session,multi_session} --out <json>` emits the scaffold record (env metadata + null measurements + `pending_implementation` marker).
+
+No Rust compatibility, drop-in, or performance claim is made by any HRS-001 row; Rust status is uniformly "Pending Rust implementation" until fixtures land via later tasks.
