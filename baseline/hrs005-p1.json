@@ -1,0 +1,50 @@
+{
+  "schema": "hermes-rs/baseline/1",
+  "profile": "single_session",
+  "pending_implementation": false,
+  "captured_at": "2026-10-14T14:58:09.406124+00:00",
+  "environment": {
+    "uname": "Linux 7.0.0-31-generic",
+    "cpu_count": 16,
+    "python_version": "3.11.15"
+  },
+  "workload": {
+    "concurrency": 1,
+    "sessions": 1,
+    "turns": 3,
+    "model": "ocg/glm-5.3-flash",
+    "provider": "9router (localhost:20128 federation gateway)",
+    "prompt": "Reply with exactly: OK",
+    "pin": "v0.22.0 @ e06df9c2eae6901f4c88f464e0ae6e753c0428b8"
+  },
+  "measurements": {
+    "duration_seconds": 15.337,
+    "cpu_percent_avg": 52.0,
+    "cpu_seconds_total": 7.979,
+    "rss_mb_end": 52.6,
+    "rss_mb_peak": 52.6,
+    "latency_p50_ms": 5093.4,
+    "latency_p95_ms": 5093.4,
+    "latency_p99_ms": 5161.6,
+    "throughput_turns_per_min": 11.74
+  },
+  "turns_detail": [
+    {
+      "ok": true,
+      "wall_s": 5.082447122083977,
+      "rss_mb_peak": 52.58984375
+    },
+    {
+      "ok": true,
+      "wall_s": 5.093366374028847,
+      "rss_mb_peak": 52.19140625
+    },
+    {
+      "ok": true,
+      "wall_s": 5.161627549910918,
+      "rss_mb_peak": 52.3125
+    }
+  ],
+  "turns_ok": "3/3",
+  "notes": "Measured against the pinned Python reference via its real agent loop. CPU% is RUSAGE_CHILDREN cumulative utime+stime divided by summed wall time (undercounts concurrent overlap); RSS sampled at 0.25s from /proc across the process group. NOT a drop-in compatibility or speedup claim."
+}

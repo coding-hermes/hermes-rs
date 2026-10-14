@@ -55,18 +55,19 @@ PROFILES = {
 }
 
 # Placeholder measurement fields the real capture pass must populate.
-# All null here on purpose: no claim of performance is made by this scaffold.
+# Every null carries a per-field reason (fleet contract: a null must say
+# WHY at the field level, not one global note — DF-HRS-102).
 MEASUREMENTS = {
-    "duration_seconds": None,
-    "cpu_percent_avg": None,
-    "cpu_seconds_total": None,
-    "rss_mb_peak": None,
-    "rss_mb_end": None,
-    "throughput_turns_per_minute": None,
-    "latency_p50_ms": None,
-    "latency_p95_ms": None,
-    "latency_p99_ms": None,
-    "storage_growth_mb": None,
+    "duration_seconds": {"value": None, "reason": "pending_implementation"},
+    "cpu_percent_avg": {"value": None, "reason": "pending_implementation"},
+    "cpu_seconds_total": {"value": None, "reason": "pending_implementation"},
+    "rss_mb_peak": {"value": None, "reason": "pending_implementation"},
+    "rss_mb_end": {"value": None, "reason": "pending_implementation"},
+    "throughput_turns_per_minute": {"value": None, "reason": "pending_implementation"},
+    "latency_p50_ms": {"value": None, "reason": "pending_implementation"},
+    "latency_p95_ms": {"value": None, "reason": "pending_implementation"},
+    "latency_p99_ms": {"value": None, "reason": "pending_implementation"},
+    "storage_growth_mb": {"value": None, "reason": "pending_implementation"},
 }
 
 
@@ -126,10 +127,11 @@ def build_record(profile: str, duration: int) -> dict:
         "environment": env,
         "measurements": dict(MEASUREMENTS),
         "notes": (
-            "Scaffold record: measurements are null placeholders. The "
-            "capture pass must run the pinned upstream reference and the "
-            "Rust implementation under identical conditions and fill every "
-            "field; nulls must carry a reason when they cannot be measured."
+            "Scaffold record: measurements are null placeholders, each with a "
+            "per-field reason (see the measurements entries). The capture pass "
+            "(scripts/measure_baseline.py) must run the pinned upstream "
+            "reference and the Rust implementation under identical conditions "
+            "and fill every field; a null that remains must keep its reason."
         ),
     }
 

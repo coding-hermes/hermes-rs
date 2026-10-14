@@ -156,29 +156,83 @@ recorded from the baseline machine (`uname -a`, `nproc`,
 - Description: single-session interactive agent loop; one conversation,
   one scripted prompt per turn, tool calls enabled, streaming on.
 - Concurrency: 1; sessions: 1.
-- Dataset: pending measurement (fixed scripted prompt set).
-- Duration: pending measurement (default requested 60 s).
-- CPU % / RSS / throughput / p50/p95/p99 / storage growth: pending
-  measurement.
+- Dataset: measured — 3 sequential turns, fixed scripted prompt
+  (`"Reply with exactly: OK"`), no tools invoked.
+- Duration: measured — 15.337 s total for 3 turns.
+- CPU % / RSS / throughput / p50/p95/p99: measured 2026-10-14 via
+  `scripts/measure_baseline.py` (HRS-005). Results:
+  cpu_percent_avg 52.0, cpu_seconds_total 7.979, rss_mb_peak 52.6,
+  latency p50/p95/p99 5093/5094/5162 ms,
+  throughput 11.74 turns/min, turns 3/3 OK.
+  Authoritative per-run JSON: `baseline/hrs005-p1.json`
+  (schema `hermes-rs/baseline/1`, environment block included).
+- Measurement context: agent loop run end-to-end via the pinned checkout's
+  `hermes -z` CLI against a real model (`ocg/glm-5.3-flash`) served by the
+  local 9router gateway (`localhost:20128`); provider/network latency is
+  INCLUDED in the numbers (these are end-to-end latency, not compute-only).
+  CPU% is RUSAGE_CHILDREN utime+stime over summed wall time. RSS sampled
+  at 0.25 s intervals from /proc across the process group. NOT a
+  compatibility or speedup claim.
+- Storage growth: not measured in this pass — reason:
+  `measurement_pending` (single script prompt adds negligible session
+  state; a tool-heavy pass will move it).
+
+### Profile P2 — `multi_session`
+
+- Description: multi-session batch with tool calls; N concurrent sessions,
+  each running a fixed scripted prompt set with tool calls, batch-style.
+- Concurrency: measured — 4 concurrent subprocesses; sessions: 4 (the
+  "target 8" from the scaffold was not reached in this pass; per-field
+  reason: `session_count_constrained_by_host_model_slots`).
+- Dataset: measured — 6 turns total (4 concurrent, then 2), fixed scripted
+  prompt, no tools invoked.
+- Duration: measured — 36.573 s total for 6 turns.
+- CPU % / RSS / throughput / p50/p95/p99: measured 2026-10-14 via
+  `scripts/measure_baseline.py` (HRS-005). Results:
+  cpu_percent_avg 52.7, cpu_seconds_total 19.265, rss_mb_peak 52.6,
+  latency p50/p95/p99 5878/6645/7266 ms,
+  throughput 9.84 turns/min, turns 6/6 OK.
+  Authoritative per-run JSON: `baseline/hrs005-p2.json`.
+- Measurement context: identical machine and provider as P1; same
+  end-to-end caveat (provider latency included; CPU% undercounts
+  concurrent overlap because it divides cumulative child CPU by summed
+  wall time). NOT a compatibility or speedup claim.
+- Storage growth: not measured in this pass — reason: `measurement_pending`.
+
+### Upstream check execution record (HRS-005, 2026-10-14)
+
+Recorded against the pinned checkout at `/tmp/hermes-upstream-pin-hrs001`
+(v0.22.0 @ `e06df9c2`), env `uv sync --frozen --group dev`, CPython 3.11.15.
+
+| Command | Exit | Result |
+|---|---|---|
+| `HERMES_HOME=<isolated> HERMES_PYTHON=<pin>/.venv/bin/python scripts/run_tests.sh tests/providers/ tests/conformance/ -q` | 0 | 21 files, 89 passed, 0 failed, 2 skipped, 36.0 s @ 16 workers |
+
+Full log: `baseline/hrs005-scoped-suite.log`.
+
+Scope rationale: the 5,724-file suite is not runnable in a tick; the
+smallest self-contained areas (providers, conformance — 21 test files,
+~81 tests) were chosen as the scoped subset. Two environment findings
+recorded because they change how any future full run must be invoked:
+
+1. **`$HERMES_HOME` ambient leakage:** `providers.get_provider_profile()`
+   reads plugin dirs from the ambient `$HERMES_HOME`. A shared host home
+   makes 19 profile/parity tests fail with `AttributeError: 'NoneType'`
+   (profile lookup returns None). An isolated empty `HERMES_HOME` fixes
+   them. Any upstream check run MUST set an isolated `$HERMES_HOME`.
+2. **Cross-file pollution under plain pytest:** running
+   `pytest tests/providers/ tests/conformance/` directly (one process)
+   still fails 19 tests that pass when each file runs alone — the upstream
+   canonical runner (`scripts/run_tests.sh`) exists precisely to run each
+   test FILE in its own subprocess. Direct pytest invocation is NOT a
+   valid parity check; only the canonical runner's results are recorded
+   here.
 - Hardware: AMD Ryzen 7 7840HS w/ Radeon 780M Graphics, 16 logical CPUs,
   59 GiB RAM.
 - OS: Ubuntu 26.04.1 LTS, kernel 7.0.0-31-generic, x86_64.
 - Runtime: CPython 3.11.15 (note: upstream supports 3.11–3.14 and targets
   3.14 for managed installs; the reference-environment choice for paired
   runs must be recorded per run).
-
-### Profile P2 — `multi_session`
-
-- Description: multi-session batch with tool calls; N concurrent sessions,
-  each running a fixed scripted prompt set with tool calls, batch-style.
-- Concurrency: pending measurement (target 4); sessions: pending
-  measurement (target 8).
-- Dataset: pending measurement (fixed scripted prompt set).
-- Duration: pending measurement (default requested 120 s).
-- CPU % / RSS / throughput / p50/p95/p99 / storage growth: pending
-  measurement.
-- Hardware / OS / runtime: identical to P1 (same machine); per-run
-  environment JSON is authoritative.
 
 ## 5. Provenance
 
