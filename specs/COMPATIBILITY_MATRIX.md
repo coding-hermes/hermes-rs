@@ -14,6 +14,7 @@ This matrix is the source of truth for scope. Each row must name the upstream ta
 | Python libraries / extensions | Untriaged | Untriaged | Must be categorized | Adapter proof pending | HRS-003 |
 | Gateway / API / streaming contracts | Untriaged | Untriaged | Untriaged | Pending baseline | HRS-001 |
 | Memory / session / history semantics | Untriaged | Untriaged | Untriaged | Pending baseline | HRS-001 |
+| Upstream test framework and comparative scoring | Latest upstream harness not yet inventoried | Untriaged | Python reference + Rust target adapter required | Run the same upstream harness/case set against both; publish per-case and aggregate score delta | HRS-001 |
 | Install, upgrade, and release behavior | Untriaged | Untriaged | Untriaged | Pending baseline | HRS-004 |
 | Observability, limits, and resource controls | Untriaged | Untriaged | Untriaged | Baseline benchmark pending | HRS-002 |
 

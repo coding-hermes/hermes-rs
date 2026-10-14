@@ -9,13 +9,14 @@ Hermes Agent's current Python implementation can impose substantial resource cos
 **Project-level completion criteria; subsystem-level criteria must be added before implementation begins.**
 
 - AC-1: Given a named upstream Hermes release, when the compatibility inventory is run, then every in-scope user-facing feature/config/protocol has an owner, source reference, status, and parity test or documented exclusion — proof: committed compatibility matrix with no unclassified in-scope rows. (M)
-- AC-2: Given an in-scope Python behavior, when the Rust implementation is tested against the same contract fixtures, then outputs, errors, configuration semantics, and externally observable side effects match or have an explicitly approved deviation — proof: automated cross-implementation contract suite with recorded fixture/version provenance. (T)
+- AC-2: Given an in-scope behavior and the pinned upstream Hermes test harness, when the Python reference and Rust implementation are run against the same harness version, cases, fixtures, and comparable environment, then results are reported side by side and the Rust score is no lower on the supported compatibility set — proof: automated paired-run report with exact upstream tag, harness revision, case denominator, pass/fail/skip reasons, and reproducible command. (T)
 - AC-3: Given an existing Python library integration, when invoked through the documented interoperability boundary, then it can be used without requiring callers to migrate to a Rust-only API — proof: executable integration test using a real supported Python package and documented adapter. (T)
 - AC-4: Given standard SQLite, a SQLite-compatible Rust engine (including Turso if its tested feature set is viable), and PostgreSQL as an optional backend, when representative workloads are replayed behind the same persistence boundary, then the report compares SQL/behavior compatibility, throughput, p95/p99 latency, CPU, RSS, storage growth, recovery, and migration/rollback costs; standard SQLite remains supported, and SQLite↔PostgreSQL import/export tools preserve supported data — proof: reproducible benchmark harness, migration round-trip tests, and checked-in results with workload/environment metadata. (T/M)
 - AC-5: Given an upstream Hermes release or relevant upstream change, when the release-tracking workflow runs, then it identifies changed source/API/config/test surfaces and creates traceable parity work or records why no implementation change is required — proof: replayable release-diff fixture and generated report. (T)
 - AC-6: Given a tagged Hermes RS release, when a supported installation is upgraded, then the documented configuration/data compatibility checks pass and an operator can roll back without silent data loss — proof: upgrade/rollback integration test on a copied fixture installation. (T)
 - AC-7: Given a claimed subsystem parity milestone, when the release gate runs, then only criteria with passing automated or artifact-backed evidence are marked complete; unsupported behaviors remain listed as gaps — proof: CI parity summary tied to upstream version and commit. (T)
 - AC-8: Given sustained scale workload profiles, when Python and Rust implementations are compared under identical conditions, then resource and latency deltas are published with reproducible workload details and no unsupported blanket efficiency claim — proof: benchmark report plus CI-smokeable regression thresholds. (T/M)
+- AC-9: Given every upstream test-harness case that can exercise an observable Hermes contract, when the same harness is run against the pinned Python reference and the Rust target adapter, then the comparative score uses the same test IDs and denominator; Rust must match or exceed the Python baseline for supported behavior, and every excluded or harness-incompatible test is classified with a reason — proof: CI artifact containing both raw result files, mapping/adaptation version, exact harness SHA, per-case comparison, and aggregate scores. (T)
 
 ## 3. Edge cases
 
@@ -49,6 +50,8 @@ Hermes Agent's current Python implementation can impose substantial resource cos
 ## 6. Test plan
 
 - Inventory and contract tests pinned to explicit upstream release tags/commits.
+- Run upstream Hermes's own test framework against the pinned Python reference and the Rust implementation through a compatible target adapter; report per-case and aggregate pass scores with the same harness version and denominator.
+- Keep Rust-native unit, integration, and end-to-end tests as additional coverage; they supplement rather than replace the upstream harness.
 - Unit tests for Rust subsystem behavior, parsing, errors, configuration, persistence invariants.
 - Cross-implementation contract tests that execute the Python reference and Rust implementation on equivalent fixtures.
 - Python interop integration tests for import/call/data/error behavior across the adapter boundary.

@@ -7,6 +7,7 @@ This is an independent reimplementation, not an official Nous Research release. 
 ## Principles
 
 - Reimplement one observable subsystem at a time; do not claim parity until contract tests pass.
+- Use the pinned upstream Hermes test harness as the common scoring baseline for Python and Rust, alongside Rust-native tests; parity scores must use the same cases and denominator.
 - Track upstream releases and changes, mapping each relevant change to an implementation or an explicit compatibility gap.
 - Preserve existing configuration, CLI, protocol, storage, and extension behavior where feasible; document intentional differences.
 - Keep standard SQLite supported. Route persistence through a backend shim; evaluate SQLite-compatible Rust engines such as [Turso](https://github.com/tursodatabase/turso) by contract tests and Hermes-shaped benchmarks, not assumptions.
