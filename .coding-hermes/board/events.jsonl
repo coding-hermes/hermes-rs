@@ -1,0 +1,4 @@
+{"id": 1, "timestamp": "2026-10-14T07:27:08.628221+00:00", "event_type": "task_created", "task_id": "HRS-001", "actor": "foreman", "detail": "{\"id\":\"HRS-001\",\"status\":\"pending\"}", "tick_number": null}
+{"id": 2, "timestamp": "2026-10-14T07:27:08.706282+00:00", "event_type": "task_created", "task_id": "HRS-002", "actor": "foreman", "detail": "{\"id\":\"HRS-002\",\"status\":\"pending\"}", "tick_number": null}
+{"id": 3, "timestamp": "2026-10-14T07:27:08.771758+00:00", "event_type": "task_created", "task_id": "HRS-003", "actor": "foreman", "detail": "{\"id\":\"HRS-003\",\"status\":\"pending\"}", "tick_number": null}
+{"id": 4, "timestamp": "2026-10-14T07:27:08.84487+00:00", "event_type": "task_created", "task_id": "HRS-004", "actor": "foreman", "detail": "{\"id\":\"HRS-004\",\"status\":\"pending\"}", "tick_number": null}

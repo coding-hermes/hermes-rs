@@ -1,0 +1,36 @@
+guards:
+  secrets: true
+  lint: true
+  tests: false # Enable when the first Rust crate and cargo test suite land.
+  test_mode: diff
+  test_command: cargo test --workspace
+  allow_skips: true
+evaluator:
+  max_iterations: 200
+  max_time: 30m
+  max_input_tokens: 1M
+  max_output_tokens: 384k
+  static_analysis_diagnostics: false
+  defaults:
+    model: deepseek-v4-flash
+    check_for_updates: false
+history:
+  enabled: true
+  storage: git
+  max_verdicts: 1000
+pipeline:
+  stages: []
+worktree_fleet:
+  disk_ceiling_mb: 4096
+resolution:
+  enabled:
+    cli: false
+    mcp: false
+    predispatch: false
+    judge_prescreen: false
+  model: typesafe/jev-1.13
+  tokens_max: 28000
+  bands:
+    resolved_at: 0.85
+    review_at: 0.5
+  egress_exclude: []
