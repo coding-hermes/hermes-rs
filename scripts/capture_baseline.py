@@ -112,11 +112,40 @@ def environment_metadata() -> dict:
     }
 
 
-def build_record(profile: str, duration: int) -> dict:
+def build_record(profile: str, duration: int, measured: dict | None = None) -> dict:
     env = environment_metadata()
     import os
 
     env["cpu_count"] = os.cpu_count()
+    if measured is not None:
+        # Measured pass: splice real values in (already {value, reason} shaped
+        # or raw numbers from scripts/measure_baseline.py output).
+        measurements = {}
+        for key, val in measured.items():
+            if isinstance(val, dict):
+                measurements[key] = val
+            else:
+                measurements[key] = (
+                    {"value": val}
+                    if val is not None
+                    else {"value": None, "reason": "not_measured_in_this_pass"}
+                )
+        return {
+            "schema": "hermes-rs/baseline/1",
+            "profile": profile,
+            "profile_description": PROFILES[profile]["description"],
+            "workload": dict(PROFILES[profile]["workload"]),
+            "requested_duration_seconds": duration,
+            "pending_implementation": False,
+            "environment": env,
+            "measurements": measurements,
+            "measured_source": "scripts/measure_baseline.py (see baseline/ JSON artifacts)",
+            "notes": (
+                "Measured record: values captured by scripts/measure_baseline.py "
+                "against the pinned upstream reference. Any null keeps an "
+                "explicit per-field reason. No compatibility or speedup claim."
+            ),
+        }
     return {
         "schema": "hermes-rs/baseline/1",
         "profile": profile,
@@ -157,9 +186,22 @@ def main(argv: list[str] | None = None) -> int:
         required=True,
         help="Path to write the JSON baseline record to.",
     )
+    parser.add_argument(
+        "--from-measured",
+        default=None,
+        help=(
+            "Optional path to a measured-run JSON produced by "
+            "scripts/measure_baseline.py; splices its real measurement values "
+            "into the record (pending_implementation=false)."
+        ),
+    )
     args = parser.parse_args(argv)
 
-    record = build_record(args.profile, args.duration)
+    measured = None
+    if args.from_measured:
+        with open(args.from_measured, "r", encoding="utf-8") as fh:
+            measured = json.load(fh).get("measurements")
+    record = build_record(args.profile, args.duration, measured)
     out_path = Path(args.out)
     if out_path.parent and str(out_path.parent):
         out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -167,7 +209,8 @@ def main(argv: list[str] | None = None) -> int:
         json.dump(record, fh, indent=2, sort_keys=True)
         fh.write("\n")
     print(
-        f"baseline record written: {out_path} (profile={args.profile}, pending_implementation=true)"
+        f"baseline record written: {out_path} (profile={args.profile}, "
+        f"pending_implementation={'false' if measured is not None else 'true'})"
     )
     return 0
 

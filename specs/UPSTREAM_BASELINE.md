@@ -206,9 +206,11 @@ Recorded against the pinned checkout at `/tmp/hermes-upstream-pin-hrs001`
 
 | Command | Exit | Result |
 |---|---|---|
-| `HERMES_HOME=<isolated> HERMES_PYTHON=<pin>/.venv/bin/python scripts/run_tests.sh tests/providers/ tests/conformance/ -q` | 0 | 21 files, 89 passed, 0 failed, 2 skipped, 36.0 s @ 16 workers |
+| `HERMES_HOME=<isolated> HERMES_PYTHON=<pin>/.venv/bin/python scripts/run_tests.sh tests/providers/ tests/conformance/ -q` | 0 | `=== Summary: 21 files, 89 tests passed, 0 failed, 2 skipped (100% complete) in 36.0s (16 workers) ===` |
 
-Full log: `baseline/hrs005-scoped-suite.log`.
+Full log: `baseline/hrs005-scoped-suite.log` (canonical runner output:
+begins with the `HERMES_PYTHON` activation banner, ends with `EXIT=0` and
+the quoted Summary line).
 
 Scope rationale: the 5,724-file suite is not runnable in a tick; the
 smallest self-contained areas (providers, conformance — 21 test files,
