@@ -11,6 +11,7 @@ venv/
 .ruff_cache/
 .coverage
 htmlcov/
+.coding-hermes/board/.lock
 .coding-hermes/board/*.db
 .coding-hermes/board/*.parquet
 .coding-hermes/board/wal/
