@@ -17,12 +17,21 @@ Pinned upstream release for all HRS-001 rows: **v0.22.0** @ commit `e06df9c2eae6
 | Upstream test framework and comparative scoring | v0.22.0 @ `e06df9c2` (harness SHA = source SHA); pytest `9.1.1` + `pytest-asyncio 1.3.0`; config `[tool.pytest.ini_options]` (`pyproject.toml` line 691, `addopts = "-m 'not integration and not live'"`); canonical runner `scripts/run_tests.sh` (per-file isolation, `TZ=UTC LANG=C.UTF-8 PYTHONHASHSEED=0`); 5,724 test files under `tests/` (largest: `tests/hermes_cli/` 1,540, `tests/gateway/` 1,017, `tests/agent/` 996) | Untriaged | Run commands: `scripts/run_tests.sh` (CI-parity) or `python -m pytest tests/ -x -q` (default set) against the pinned Python reference; Rust target adapter required before any comparative score (AC-2/AC-9) | Documented (source: `scripts/run_tests.sh`; `pyproject.toml`; `tests/conftest.py`); full inventory in `UPSTREAM_BASELINE.md` §2 | HRS-001 |
 | Persistence and database access | Upstream baseline pending; retain SQLite | Untriaged | Untriaged | Compare stock SQLite and optional Turso; PostgreSQL optional, migration round-trips required | HRS-002 |
 | Python libraries / extensions | Untriaged | Untriaged | Must be categorized | Adapter proof pending | HRS-003 |
-| Install, upgrade, and release behavior | Untriaged | Untriaged | Untriaged | Pending baseline | HRS-004 |
+| Install, upgrade, and release behavior | v0.22.0 @ `e06df9c2` (pin of record); newer releases tracked per-release: v0.22.2 snapshotted against v0.22.1 (HRS-004) | Untriaged — hermes-rs has no install/upgrade implementation; upstream release tracking and the parity release gate are in place (`scripts/track_upstream_release.sh`, `scripts/check_release_parity.py`, `.github/workflows/release-parity.yml`) | Untriaged | Documented (`docs/upstream-releases/v0.22.2.json`, `docs/upstream-releases/PARITY.md`, `docs/upstream-releases/parity-ledger.md`; no-network fixture test `tests/release_parity_test.py`) | HRS-004 |
 | Observability, limits, and resource controls | Untriaged | Untriaged | Untriaged | Baseline benchmark pending | HRS-002 |
 
 ## Update rule
 
 For each upstream release, record the tag/commit and review changed files, APIs, configuration, and tests. Add/adjust rows and tasks before claiming the release is tracked. Do not convert an unknown row to supported without a fixture or an explicit, reviewed exclusion.
+
+Since HRS-004 this rule is operationalized: each tracked upstream release is snapshotted by `scripts/track_upstream_release.sh` into `docs/upstream-releases/<tag>.json` and gated by `scripts/check_release_parity.py`, which regenerates `docs/upstream-releases/PARITY.md` and appends `PARI-<n>` rows to `docs/upstream-releases/parity-ledger.md`. That report and ledger are the tracking evidence this rule requires.
+
+## Upstream version mapping and supported-upstream range (HRS-004)
+
+- **Pin of record:** `v0.22.0` @ `e06df9c2eae6901f4c88f464e0ae6e753c0428b8` (HRS-001; provenance in `UPSTREAM_BASELINE.md`). All matrix row claims are made against the pin.
+- **Version mapping:** upstream tag → `docs/upstream-releases/<tag>.json` (deterministic snapshot: release metadata, verbatim release-notes body, changed-file summary with its exact compare base and SHAs, and pointers into the source/config/tests/migrations areas) → `docs/upstream-releases/parity-ledger.md` (one `PARI-<n>` row per pending-triage change area; JSON-lines content) → `docs/upstream-releases/PARITY.md` (per-release parity report, regenerated deterministically).
+- **Supported-upstream range:** the `v0.22.x` release line, bounded below by the pin of record. Releases newer than the pin (currently `v0.22.1`, `v0.22.2`) are **tracked but not supported**: each carries open parity items until every one is triaged into parity work or a reviewed no-action exclusion. Entry into the supported range is an evidence gate (fixtures or reviewed exclusions per the matrix rule above), never a default; releases older than the pin are out of scope.
+- **Known compatibility gaps** for the newest tracked release are published in `docs/upstream-releases/PARITY.md` ("Known compatibility gaps"); no compatibility, drop-in, or performance claim is derived from release tracking.
 
 ## Upstream baseline (HRS-001)
 

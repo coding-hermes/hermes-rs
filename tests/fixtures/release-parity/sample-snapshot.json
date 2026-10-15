@@ -1,0 +1,166 @@
+{
+  "area_pointers": {
+    "compare_url": "https://github.com/NousResearch/hermes-agent/compare/v0.22.2...v9.9.9-fixture",
+    "config": {
+      "count": 0,
+      "note": "no config-area files in this comparison",
+      "paths": []
+    },
+    "migrations": {
+      "count": 1,
+      "note": "pointers only — full set for this comparison",
+      "paths": [
+        "hermes_state_migrations/0007_add_turn_receipts.py"
+      ],
+      "urls": [
+        "https://github.com/NousResearch/hermes-agent/blob/main/hermes_state_migrations/0007_add_turn_receipts.py"
+      ]
+    },
+    "source": {
+      "count": 2,
+      "note": "pointers only — full set for this comparison",
+      "paths": [
+        "agent/conversation_loop.py",
+        "hermes_cli/config.py"
+      ],
+      "urls": [
+        "https://github.com/NousResearch/hermes-agent/blob/main/agent/conversation_loop.py",
+        "https://github.com/NousResearch/hermes-agent/blob/main/hermes_cli/config.py"
+      ]
+    },
+    "tests": {
+      "count": 1,
+      "note": "pointers only — full set for this comparison",
+      "paths": [
+        "tests/agent/test_conversation_loop.py"
+      ],
+      "urls": [
+        "https://github.com/NousResearch/hermes-agent/blob/main/tests/agent/test_conversation_loop.py"
+      ]
+    }
+  },
+  "compare": {
+    "ahead_by": 3,
+    "api_url": "https://api.github.com/repos/NousResearch/hermes-agent/compare/v0.22.2...v9.9.9-fixture",
+    "base": {
+      "mode": "previous-tag",
+      "ref": "v0.22.2",
+      "sha": "0000000000000000000000000000000000000002"
+    },
+    "changed_files_top3": [
+      {
+        "area": "source",
+        "path": "agent/conversation_loop.py"
+      },
+      {
+        "area": "migrations",
+        "path": "hermes_state_migrations/0007_add_turn_receipts.py"
+      },
+      {
+        "area": "tests",
+        "path": "tests/agent/test_conversation_loop.py"
+      }
+    ],
+    "file_list_cap": 300,
+    "file_list_complete": true,
+    "head": {
+      "ref": "v9.9.9-fixture",
+      "sha": "0000000000000000000000000000000000000003"
+    },
+    "summary": {
+      "areas": {
+        "docs": {
+          "additions": 5,
+          "deletions": 0,
+          "files": 1
+        },
+        "migrations": {
+          "additions": 20,
+          "deletions": 0,
+          "files": 1
+        },
+        "source": {
+          "additions": 40,
+          "deletions": 10,
+          "files": 2
+        },
+        "tests": {
+          "additions": 15,
+          "deletions": 2,
+          "files": 1
+        }
+      },
+      "top_buckets": {
+        "agent": {
+          "additions": 25,
+          "churn": 35,
+          "deletions": 10,
+          "files": 1
+        },
+        "hermes_cli": {
+          "additions": 15,
+          "churn": 15,
+          "deletions": 0,
+          "files": 1
+        },
+        "hermes_state_migrations": {
+          "additions": 20,
+          "churn": 20,
+          "deletions": 0,
+          "files": 1
+        },
+        "tests": {
+          "additions": 15,
+          "churn": 17,
+          "deletions": 2,
+          "files": 1
+        },
+        "website": {
+          "additions": 5,
+          "churn": 5,
+          "deletions": 0,
+          "files": 1
+        }
+      },
+      "top_paths_by_area": {
+        "docs": [
+          "website/docs/user-guide/configuration.md"
+        ],
+        "migrations": [
+          "hermes_state_migrations/0007_add_turn_receipts.py"
+        ],
+        "source": [
+          "agent/conversation_loop.py",
+          "hermes_cli/config.py"
+        ],
+        "tests": [
+          "tests/agent/test_conversation_loop.py"
+        ]
+      },
+      "total_additions": 80,
+      "total_deletions": 12,
+      "total_files": 5
+    },
+    "total_commits": 3,
+    "url": "https://github.com/NousResearch/hermes-agent/compare/v0.22.2...v9.9.9-fixture"
+  },
+  "created_at": "2026-10-20T00:00:00Z",
+  "draft": false,
+  "head_sha": "0000000000000000000000000000000000000003",
+  "prerelease": false,
+  "published_at": "2026-10-20T00:00:00Z",
+  "release_name": "Hermes Agent v9.9.9 (FIXTURE — synthetic, not a real upstream release)",
+  "release_notes": {
+    "body": "# Synthetic fixture\n\nThis body is checked-in test data for tests/release_parity_test.py. It is not\nan upstream release note and must never be cited as one.",
+    "source": "tests/fixtures/release-parity/sample-snapshot.json"
+  },
+  "release_url": "https://example.invalid/NousResearch/hermes-agent/releases/tag/v9.9.9-fixture",
+  "schema": "hermes-rs/upstream-release-snapshot",
+  "schema_version": 1,
+  "tag": "v9.9.9-fixture",
+  "tool": {
+    "classification": "scripts/release_areas.py",
+    "github_api_repo": "NousResearch/hermes-agent",
+    "script": "scripts/track_upstream_release.sh"
+  }
+}
