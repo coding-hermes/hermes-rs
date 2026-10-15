@@ -715,4 +715,3 @@ pub const FRESH_STORE_CENSUS_JSON: &str = r#"{
   "messages_fts_trigram_src"
  ]
 }"#;
-
