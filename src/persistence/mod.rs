@@ -10,6 +10,8 @@
 pub mod api;
 pub mod stock_sqlite;
 pub mod upstream_ddl;
+#[cfg(feature = "turso")]
+pub mod turso_backend;
 
 pub use api::{
     AppendMessage, BatchAppendReport, BusyKind, Capabilities, Capability, CapabilitySupport,
@@ -19,3 +21,5 @@ pub use api::{
     SCHEMA_VERSION_KNOWN,
 };
 pub use stock_sqlite::StockSqliteBackend;
+#[cfg(feature = "turso")]
+pub use turso_backend::TursoBackend;

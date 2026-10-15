@@ -26,8 +26,19 @@ path = "src/bin/session_adapter.rs"
 # `bundled` pins libsqlite3 (FTS5 + trigram tokenizer enabled in the
 # amalgamation) so file-format behavior does not drift with the host
 # libsqlite3. No alternative engine is linked (HRS-009 deferred).
+# HRS-009 optional candidate-backend evaluation (specs/backend-evaluation.md):
+# `turso` is an OPTIONAL feature, never a default; stock SQLite remains the
+# only default backend (specs/persistence-shim.md §3.1). The build without
+# this feature must stay green.
+[features]
+turso = ["dep:turso", "dep:tokio"]
+
 [dependencies]
 rusqlite = { version = "0.40", features = ["bundled", "backup", "functions"] }
 regex = "1"
 # HRS-003 Python interop adapter: JSON request/response frames over stdio.
 serde_json = "1"
+# HRS-009 optional candidate backend (feature `turso` only). Async API —
+# driven from the sync shim through a current-thread tokio runtime.
+turso = { version = "0.8.3", optional = true }
+tokio = { version = "1", features = ["rt", "time"], optional = true }
