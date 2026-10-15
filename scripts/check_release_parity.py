@@ -299,8 +299,9 @@ def render_parity(
     lines.append(f"| Ledger | `{ledger_path.name}` |")
     lines.append(f"| Parity items this run | {len(assigned)} |")
     lines.append(f"| No-action areas this run | {len(no_action)} |")
-    lines.append("")
-    return "\n".join(lines) + "\n"
+    # Single trailing newline only: a trailing blank line trips the repo's
+    # `git show --check` whitespace gate, and the no-op gate compares bytes.
+    return "\n".join(lines).rstrip("\n") + "\n"
 
 
 def main(argv: list[str] | None = None) -> int:

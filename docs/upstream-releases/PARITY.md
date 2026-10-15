@@ -82,4 +82,3 @@ Every parity item above is an OPEN gap for upstream `v0.22.2` relative to the he
 | Ledger | `parity-ledger.md` |
 | Parity items this run | 3 |
 | No-action areas this run | 3 |
-
