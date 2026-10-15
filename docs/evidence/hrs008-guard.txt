@@ -1,0 +1,10 @@
+Command: gitreins guard
+Result line: Tier 1: DEGRADED PASS (skips: lint=no staged files)  (test mode: diff, full suite — safety trigger)
+Exit code: 0
+Guard log: .gitreins/logs/guard-20261015T132120.294534Z.log
+
+The guard executed the configured full test command successfully (exit_code=0). Its test output shows 1 library unit test and 1 executable integration test passed. The guard's separate lint check was skipped because this GitReins installation reports "No Python files staged"; Rust formatting and Clippy are included in the configured test_command and were also run independently:
+  cargo fmt --all -- --check
+  cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+EXIT_CODE=0

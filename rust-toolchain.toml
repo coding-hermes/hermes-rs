@@ -1,0 +1,5 @@
+[toolchain]
+# Follow the stable release channel; CI installs the same channel and components.
+channel = "stable"
+components = ["rustfmt", "clippy"]
+profile = "minimal"

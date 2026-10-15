@@ -1,9 +1,9 @@
 guards:
   secrets: true
   lint: true
-  tests: false # Enable when the first Rust crate and cargo test suite land.
+  tests: true # Run the Rust CI-equivalent battery in the tier-1 guard.
   test_mode: diff
-  test_command: cargo test --workspace
+  test_command: cargo fmt --all -- --check && cargo clippy --workspace --all-targets --all-features -- -D warnings && cargo test --workspace --all-features
   allow_skips: true
 evaluator:
   max_iterations: 200

@@ -1,0 +1,18 @@
+[workspace]
+resolver = "2"
+members = ["."]
+
+[package]
+name = "hermes-rs"
+version = "0.1.0"
+edition = "2021"
+description = "Foundation scaffold for the Hermes RS project"
+license = "MIT"
+
+[lib]
+name = "hermes_rs"
+path = "src/lib.rs"
+
+[[bin]]
+name = "hermes-rs"
+path = "src/main.rs"

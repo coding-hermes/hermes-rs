@@ -1,0 +1,26 @@
+   Compiling hermes-rs v0.1.0 (/home/kara/hermes-rs)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.21s
+     Running unittests src/lib.rs (/var/tmp/hermes-cargo-target/debug/deps/hermes_rs-f662f3247d102904)
+
+running 1 test
+test tests::reports_scaffold_status ... FAILED
+
+failures:
+
+---- tests::reports_scaffold_status stdout ----
+
+thread 'tests::reports_scaffold_status' (3540108) panicked at src/lib.rs:14:9:
+assertion `left == right` failed
+  left: "Hermes RS scaffold: no agent functionality implemented"
+ right: "deliberate failure used to prove the test gate is active"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    tests::reports_scaffold_status
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `--lib`
+
+EXIT_CODE=101
