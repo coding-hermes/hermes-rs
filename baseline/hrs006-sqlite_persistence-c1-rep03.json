@@ -1,0 +1,139 @@
+{
+  "schema": "hermes-rs/baseline/2",
+  "profile": "sqlite_persistence",
+  "environment": {
+    "uname": "Linux karaHermes-mde-7840hs 7.0.0-31-generic x86_64",
+    "kernel": "7.0.0-31-generic",
+    "arch": "x86_64",
+    "os_release": "Ubuntu 26.04.1 LTS",
+    "cpu_count": 16,
+    "cpu_model": "AMD Ryzen 7 7840HS w/ Radeon 780M Graphics",
+    "python_version": "3.11.15",
+    "captured_at": "2026-10-15T01:07:56+00:00"
+  },
+  "workload": {
+    "concurrency": 1,
+    "sessions_per_rep": 1,
+    "turns_per_session": 3,
+    "reps": 5,
+    "model": "ocg/glm-5.3-flash",
+    "provider": "9router (localhost:20128 federation gateway)",
+    "pin": "v0.22.0 @ e06df9c2eae6901f4c88f464e0ae6e753c0428b8",
+    "pin_path": "/tmp/hermes-upstream-pin-hrs001",
+    "pin_verified": true,
+    "pin_note": "verified v0.22.0 @ e06df9c2eae6901f4c88f464e0ae6e753c0428b8",
+    "hermes_argv_template": "uv run hermes -z <prompt> -m <model> --provider 9router [--resume <session-id> preferred, bare -c fallback on turns>0]",
+    "profile_prompts": {
+      "continuing_conversation": [
+        "Remember this codeword for the rest of this conversation: LANTERN-7. Reply with exactly: acknowledged.",
+        "What codeword did I ask you to remember earlier in this conversation? Reply with the codeword only.",
+        "Reply with exactly: LANTERN-7 session check complete."
+      ],
+      "sqlite_persistence": [
+        "Remember this token for the rest of this conversation: ZEPHYR-31. Reply with exactly: stored.",
+        "Recall the token I asked you to remember earlier in this conversation and reply with exactly that token.",
+        "Recall the token again and reply with exactly: ZEPHYR-31 recalled."
+      ],
+      "tool_execution": "per turn: random token file planted in the session home; agent told to `cat <abs path>` and echo its output"
+    }
+  },
+  "sampler_selftest": "pass",
+  "sampler_selftest_details": {
+    "expected_cpu_s": 2.5,
+    "expected_rss_mb": 200.0,
+    "measured_cpu_s": 2.45,
+    "measured_rss_peak_mb": 231.6,
+    "ticks": 10,
+    "child_wall_s": 2.655,
+    "fail_reason": ""
+  },
+  "method": {
+    "cpu": "per-turn process-tree CPU delta (see cpu_method in measurements); replaces HRS-005's cumulative RUSAGE_CHILDREN max() which misattributed CPU under concurrency",
+    "wall": "duration_seconds = batch elapsed monotonic wall clock; per-turn walls kept for latency percentiles only",
+    "rss": "rss_mb_peak = max tree tick sum; rss_mb_end = final tree sample of the last-finishing turn (HRS-005 wrongly published peak as end)",
+    "latency_percentiles": "nearest-rank; low_sample flag when n<20",
+    "storage": "du-equivalent byte sum over each session HERMES_HOME tree before/after the batch (sqlite_persistence only)",
+    "continuing_semantics": "continuing = every turn after the first resumes the SAME session: preferred via `--resume <session-id>` (id read from the home's session store right after turn 0), fallback via bare `-c` (MRU inside the turn's isolated HERMES_HOME); explicit ids are preferred because the pin writes last_activity_at at process exit and that write is occasionally lost under load, which empties the MRU lookup while session content stays intact (observed live, c4). Continuation itself is VERIFIED per turn by codeword recall, not assumed",
+    "null_contract": "every null is {value: null, reason: ...} or carries a sibling <field>_reason key (DF-HRS-102)"
+  },
+  "notes": "Measured against the pinned Python reference via its real agent loop; provider/network latency is included (end-to-end, not compute-only). Local compute/resource measurement ONLY - this record makes no Python-vs-Rust compatibility or efficiency claim.",
+  "rep": 3,
+  "captured_at": "2026-10-15T01:10:15.913601+00:00",
+  "measurements": {
+    "duration_seconds": 26.728,
+    "wall_clock_method": "time.monotonic elapsed around the whole concurrent batch (NOT the sum of per-turn walls)",
+    "per_turn_wall_sum_s": 16.618,
+    "wall_sum_over_batch": 0.622,
+    "cpu_seconds_total": 5.67,
+    "cpu_method": "per-turn process-tree delta of /proc/<pid>/stat utime+stime (CLK_TCK=100 jiffies/s), sampled every 0.25s over the spawned process and all descendants (PPid walk); cumulative for any process alive at >=1 tick; sub-tick startup/teardown CPU is under-counted",
+    "cpu_turns_without_samples": 0,
+    "cpu_percent_avg": 21.2,
+    "rss_mb_peak": 247.9,
+    "rss_mb_peak_reason": null,
+    "rss_mb_end": {
+      "value": 245.9,
+      "method_note": "final tree sample of the last-finishing turn (concurrency=1); at concurrency 1 this is the batch tree's end sample"
+    },
+    "rss_method": "sum of /proc/<pid>/statm resident pages x page size across the process tree each 0.25s tick; peak = max tick sum; end = last tick sum before exit",
+    "latency_p50_ms": {
+      "value": 5455.4,
+      "low_sample": true,
+      "note": "nearest-rank over n=3 turns (<20)"
+    },
+    "latency_p95_ms": {
+      "value": 6525.4,
+      "low_sample": true,
+      "note": "nearest-rank over n=3 turns (<20)"
+    },
+    "latency_p99_ms": {
+      "value": 6525.4,
+      "low_sample": true,
+      "note": "nearest-rank over n=3 turns (<20)"
+    },
+    "latency_percentile_method": "nearest-rank over per-turn wall seconds of successful turns (falls back to all turns when none succeeded)",
+    "latency_sample_count": 3,
+    "throughput_turns_per_min": 6.73,
+    "storage_growth_mb": {
+      "value": 0.339
+    }
+  },
+  "turns_detail": [
+    {
+      "ok": true,
+      "wall_s": 6.525389052927494,
+      "cpu_s": 2.0,
+      "cpu_ticks": 24,
+      "rss_mb_peak": 245.9,
+      "rss_mb_end": 245.9,
+      "output_tail": "stored.\n",
+      "session": 0,
+      "turn": 0
+    },
+    {
+      "ok": true,
+      "wall_s": 5.4553534761071205,
+      "cpu_s": 1.88,
+      "cpu_ticks": 20,
+      "rss_mb_peak": 242.3,
+      "rss_mb_end": 242.3,
+      "output_tail": "ZEPHYR-31\n",
+      "session": 0,
+      "turn": 1
+    },
+    {
+      "ok": true,
+      "wall_s": 4.636790079064667,
+      "cpu_s": 1.79,
+      "cpu_ticks": 17,
+      "rss_mb_peak": 247.9,
+      "rss_mb_end": 242.8,
+      "output_tail": "ZEPHYR-31 recalled.\n",
+      "session": 0,
+      "turn": 2
+    }
+  ],
+  "turns_ok": "3/3",
+  "session_homes": [
+    "/tmp/hrs006-homes-sql/sqlite_persistence-c1-rep03-s0"
+  ]
+}

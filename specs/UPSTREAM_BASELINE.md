@@ -315,6 +315,29 @@ rss_mb_peak, rss_mb_end, throughput and storage growth.
   session/rep, c4 = 4 concurrent sessions/rep); file names carry the
   concurrency and rep. Null contract (DF-HRS-102): every null is
   `{"value": null, "reason": ...}` or carries a sibling `<field>_reason`.
+- Records (rework pass, completing the profile matrix):
+  `baseline/hrs006-tool_execution-c{1,4}-*` and
+  `baseline/hrs006-sqlite_persistence-c{1,4}-*` — same shape
+  (5 reps × 3 turns per session; c1 = 1 session/rep → 3 turns/rep,
+  c4 = 4 sessions/rep → 12 turns/rep). Summary means (± sample stddev
+  over 5 reps; wall = batch elapsed, cpu = tree CPU per rep batch):
+
+  | profile | conc | wall_s | cpu_s | rss_mb_peak | storage_growth_mb | turns_ok |
+  |---|---|---|---|---|---|---|
+  | tool_execution | 1 | 38.2 ±7.6 | 6.4 ±1.9 | 249.4 ±1.6 | n/a (not measured for this profile) | 15/15 |
+  | tool_execution | 4 | 40.9 ±4.2 | 29.1 ±2.3 | 251.4 ±1.0 | n/a (not measured for this profile) | 60/60 |
+  | sqlite_persistence | 1 | 33.8 ±9.8 | 5.9 ±0.3 | 247.4 ±1.9 | 0.339 (0.339 every rep) | 15/15 |
+  | sqlite_persistence | 4 | 44.5 ±9.9 | 25.8 ±2.0 | 252.3 ±7.2 | 1.356 (1.356 every rep) | 60/60 |
+
+  Storage growth was MEASURED, not null: du-equivalent byte sums over the
+  session HERMES_HOME trees before/after each batch (c1 grows one session
+  store per batch ≈ 0.34 MB; c4 grows four ≈ 1.36 MB — 4× confirms the
+  growth scales with session count). The only nulls in these records are
+  tool_execution's `storage_growth_mb` = `{value: null, reason:
+  "storage_growth_only_measured_for_sqlite_persistence"}` (profile is
+  out of that measurement's scope by design). Sampler selftest: pass in
+  all four summaries. Captured live 2026-10-15 00:59–01:16 UTC in four
+  consecutive harness runs.
 - Separation rule: these are local measurements of the pinned PYTHON
   reference only. No Python-vs-Rust efficiency claim is made anywhere in
   this document.

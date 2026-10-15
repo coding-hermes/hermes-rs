@@ -1,0 +1,199 @@
+{
+  "schema": "hermes-rs/baseline/2",
+  "profile": "tool_execution",
+  "environment": {
+    "uname": "Linux karaHermes-mde-7840hs 7.0.0-31-generic x86_64",
+    "kernel": "7.0.0-31-generic",
+    "arch": "x86_64",
+    "os_release": "Ubuntu 26.04.1 LTS",
+    "cpu_count": 16,
+    "cpu_model": "AMD Ryzen 7 7840HS w/ Radeon 780M Graphics",
+    "python_version": "3.11.15",
+    "captured_at": "2026-10-15T01:03:47+00:00"
+  },
+  "workload": {
+    "concurrency": 4,
+    "sessions_per_rep": 4,
+    "turns_per_session": 3,
+    "reps": 5,
+    "model": "ocg/glm-5.3-flash",
+    "provider": "9router (localhost:20128 federation gateway)",
+    "pin": "v0.22.0 @ e06df9c2eae6901f4c88f464e0ae6e753c0428b8",
+    "pin_path": "/tmp/hermes-upstream-pin-hrs001",
+    "pin_verified": true,
+    "pin_note": "verified v0.22.0 @ e06df9c2eae6901f4c88f464e0ae6e753c0428b8",
+    "hermes_argv_template": "uv run hermes -z <prompt> -m <model> --provider 9router [--resume <session-id> preferred, bare -c fallback on turns>0]",
+    "profile_prompts": {
+      "continuing_conversation": [
+        "Remember this codeword for the rest of this conversation: LANTERN-7. Reply with exactly: acknowledged.",
+        "What codeword did I ask you to remember earlier in this conversation? Reply with the codeword only.",
+        "Reply with exactly: LANTERN-7 session check complete."
+      ],
+      "sqlite_persistence": [
+        "Remember this token for the rest of this conversation: ZEPHYR-31. Reply with exactly: stored.",
+        "Recall the token I asked you to remember earlier in this conversation and reply with exactly that token.",
+        "Recall the token again and reply with exactly: ZEPHYR-31 recalled."
+      ],
+      "tool_execution": "per turn: random token file planted in the session home; agent told to `cat <abs path>` and echo its output"
+    }
+  },
+  "sampler_selftest": "pass",
+  "sampler_selftest_details": {
+    "expected_cpu_s": 2.5,
+    "expected_rss_mb": 200.0,
+    "measured_cpu_s": 2.45,
+    "measured_rss_peak_mb": 231.6,
+    "ticks": 10,
+    "child_wall_s": 2.659,
+    "fail_reason": ""
+  },
+  "method": {
+    "cpu": "per-turn process-tree CPU delta (see cpu_method in measurements); replaces HRS-005's cumulative RUSAGE_CHILDREN max() which misattributed CPU under concurrency",
+    "wall": "duration_seconds = batch elapsed monotonic wall clock; per-turn walls kept for latency percentiles only",
+    "rss": "rss_mb_peak = max tree tick sum; rss_mb_end = final tree sample of the last-finishing turn (HRS-005 wrongly published peak as end)",
+    "latency_percentiles": "nearest-rank; low_sample flag when n<20",
+    "storage": "du-equivalent byte sum over each session HERMES_HOME tree before/after the batch (sqlite_persistence only)",
+    "continuing_semantics": "continuing = every turn after the first resumes the SAME session: preferred via `--resume <session-id>` (id read from the home's session store right after turn 0), fallback via bare `-c` (MRU inside the turn's isolated HERMES_HOME); explicit ids are preferred because the pin writes last_activity_at at process exit and that write is occasionally lost under load, which empties the MRU lookup while session content stays intact (observed live, c4). Continuation itself is VERIFIED per turn by codeword recall, not assumed",
+    "null_contract": "every null is {value: null, reason: ...} or carries a sibling <field>_reason key (DF-HRS-102)"
+  },
+  "notes": "Measured against the pinned Python reference via its real agent loop; provider/network latency is included (end-to-end, not compute-only). Local compute/resource measurement ONLY - this record makes no Python-vs-Rust compatibility or efficiency claim.",
+  "kind": "summary",
+  "captured_span": {
+    "start": "2026-10-15T01:03:47.693032+00:00",
+    "end": "2026-10-15T01:07:12.154487+00:00"
+  },
+  "per_rep": [
+    {
+      "rep": 0,
+      "file": "hrs006-tool_execution-c4-rep00.json",
+      "turns_ok": "12/12",
+      "duration_seconds": 45.217,
+      "cpu_seconds_total": 26.08,
+      "rss_mb_peak": 250.1,
+      "rss_mb_end": 248.8,
+      "throughput_turns_per_min": 15.92,
+      "storage_growth_mb": {
+        "value": null,
+        "reason": "storage_growth_only_measured_for_sqlite_persistence"
+      }
+    },
+    {
+      "rep": 1,
+      "file": "hrs006-tool_execution-c4-rep01.json",
+      "turns_ok": "12/12",
+      "duration_seconds": 40.102,
+      "cpu_seconds_total": 27.47,
+      "rss_mb_peak": 252.6,
+      "rss_mb_end": 250.6,
+      "throughput_turns_per_min": 17.95,
+      "storage_growth_mb": {
+        "value": null,
+        "reason": "storage_growth_only_measured_for_sqlite_persistence"
+      }
+    },
+    {
+      "rep": 2,
+      "file": "hrs006-tool_execution-c4-rep02.json",
+      "turns_ok": "12/12",
+      "duration_seconds": 37.167,
+      "cpu_seconds_total": 32.1,
+      "rss_mb_peak": 251.1,
+      "rss_mb_end": 248.8,
+      "throughput_turns_per_min": 19.37,
+      "storage_growth_mb": {
+        "value": null,
+        "reason": "storage_growth_only_measured_for_sqlite_persistence"
+      }
+    },
+    {
+      "rep": 3,
+      "file": "hrs006-tool_execution-c4-rep03.json",
+      "turns_ok": "12/12",
+      "duration_seconds": 45.302,
+      "cpu_seconds_total": 29.79,
+      "rss_mb_peak": 251.0,
+      "rss_mb_end": 247.6,
+      "throughput_turns_per_min": 15.89,
+      "storage_growth_mb": {
+        "value": null,
+        "reason": "storage_growth_only_measured_for_sqlite_persistence"
+      }
+    },
+    {
+      "rep": 4,
+      "file": "hrs006-tool_execution-c4-rep04.json",
+      "turns_ok": "12/12",
+      "duration_seconds": 36.667,
+      "cpu_seconds_total": 29.98,
+      "rss_mb_peak": 252.0,
+      "rss_mb_end": 48.9,
+      "throughput_turns_per_min": 19.64,
+      "storage_growth_mb": {
+        "value": null,
+        "reason": "storage_growth_only_measured_for_sqlite_persistence"
+      }
+    }
+  ],
+  "stats": {
+    "wall_s": {
+      "mean": 40.891,
+      "stddev": 4.1983,
+      "min": 36.667,
+      "max": 45.302,
+      "n": 5,
+      "stddev_method": "sample stddev over reps"
+    },
+    "cpu_s": {
+      "mean": 29.084,
+      "stddev": 2.3466,
+      "min": 26.08,
+      "max": 32.1,
+      "n": 5,
+      "stddev_method": "sample stddev over reps"
+    },
+    "rss_mb_peak": {
+      "mean": 251.36,
+      "stddev": 0.9659,
+      "min": 250.1,
+      "max": 252.6,
+      "n": 5,
+      "stddev_method": "sample stddev over reps"
+    },
+    "rss_mb_end": {
+      "mean": 208.94,
+      "stddev": 89.4715,
+      "min": 48.9,
+      "max": 250.6,
+      "n": 5,
+      "stddev_method": "sample stddev over reps"
+    },
+    "throughput_turns_per_min": {
+      "mean": 17.754,
+      "stddev": 1.8059,
+      "min": 15.89,
+      "max": 19.64,
+      "n": 5,
+      "stddev_method": "sample stddev over reps"
+    },
+    "storage_growth_mb": {
+      "mean": null,
+      "stddev": null,
+      "min": null,
+      "max": null,
+      "n": 0,
+      "reason": "all reps null (rep0: storage_growth_only_measured_for_sqlite_persistence; rep1: storage_growth_only_measured_for_sqlite_persistence; rep2: storage_growth_only_measured_for_sqlite_persistence; rep3: storage_growth_only_measured_for_sqlite_persistence; rep4: storage_growth_only_measured_for_sqlite_persistence)"
+    }
+  },
+  "concurrency_math_check": {
+    "duration_seconds_is_batch_elapsed": true,
+    "assertion": "duration_seconds in every rep file is the time.monotonic elapsed around the whole concurrent batch, never the sum of per-turn walls; wall_sum_over_batch >> 1 at concurrency>1 demonstrates the old summed-wall figure would have been wrong",
+    "per_rep_wall_sum_over_batch": [
+      "hrs006-tool_execution-c4-rep00.json",
+      "hrs006-tool_execution-c4-rep01.json",
+      "hrs006-tool_execution-c4-rep02.json",
+      "hrs006-tool_execution-c4-rep03.json",
+      "hrs006-tool_execution-c4-rep04.json"
+    ],
+    "per_rep_ratio_field": "measurements.wall_sum_over_batch"
+  }
+}
