@@ -1,0 +1,297 @@
+{
+  "fixture": "tests/fixtures/hrs010/state.db",
+  "producer": {
+    "reference": "Hermes Agent (pinned upstream, specs/UPSTREAM_BASELINE.md)",
+    "pin": "v0.22.0 @ e06df9c2eae6901f4c88f464e0ae6e753c0428b8",
+    "checkout": "/tmp/hermes-upstream-pin-hrs001",
+    "python": "3.14.5",
+    "sqlite_lib": "3.50.4",
+    "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.43",
+    "generator": "scripts/make_hrs010_fixture.py"
+  },
+  "schema_version": 31,
+  "state_meta": {
+    "store_instance_id": "46b5e120-2c4b-4baa-93a8-db47d3754bd6",
+    "store_created_at_utc": "2026-10-15T17:05:30.677997+00:00",
+    "message_uid_backfill": "1",
+    "db_file_generation": "334e6153ce39475aa0fdae8d92c18202"
+  },
+  "journal_mode_at_rest": "delete",
+  "fts_counts": {
+    "messages": 6,
+    "messages_fts": 6,
+    "messages_fts_trigram": 5,
+    "messages_fts_cjk": "unavailable: no such table: messages_fts_cjk"
+  },
+  "conversation_generations": [
+    {
+      "source": "cli",
+      "session_key": "tg:1003310984808:2",
+      "generation": 1
+    }
+  ],
+  "session_model_usage": [
+    {
+      "session_id": "20261015_090000_a1b2c3",
+      "model": "glm-5.3-flash",
+      "billing_provider": "custom",
+      "billing_base_url": "http://127.0.0.1:20128/v1",
+      "billing_mode": "gateway",
+      "task": "",
+      "api_call_count": 2,
+      "input_tokens": 120,
+      "output_tokens": 340,
+      "cache_read_tokens": 50,
+      "cache_write_tokens": 10,
+      "reasoning_tokens": 20,
+      "estimated_cost_usd": 0.0012,
+      "actual_cost_usd": 0.0,
+      "cost_status": null,
+      "cost_source": null,
+      "first_seen": 1792083950.1597648,
+      "last_seen": 1792083950.1597648
+    }
+  ],
+  "sqlite_master_census": {
+    "table": [
+      "async_delegations",
+      "compression_locks",
+      "conversation_generations",
+      "gateway_heartbeats",
+      "gateway_hygiene_state",
+      "gateway_routing",
+      "messages",
+      "messages_fts",
+      "messages_fts_config",
+      "messages_fts_data",
+      "messages_fts_docsize",
+      "messages_fts_idx",
+      "messages_fts_trigram",
+      "messages_fts_trigram_config",
+      "messages_fts_trigram_data",
+      "messages_fts_trigram_docsize",
+      "messages_fts_trigram_idx",
+      "schema_version",
+      "session_model_usage",
+      "session_turn_leases",
+      "sessions",
+      "state_meta",
+      "system_prompts"
+    ],
+    "index": [
+      "idx_async_delegations_delivery",
+      "idx_compression_locks_expires",
+      "idx_messages_active_null",
+      "idx_messages_assistant_calls_by_session",
+      "idx_messages_display_backfill",
+      "idx_messages_display_identity",
+      "idx_messages_display_page",
+      "idx_messages_platform_msg_id",
+      "idx_messages_session",
+      "idx_messages_session_active",
+      "idx_messages_session_id",
+      "idx_messages_session_uid",
+      "idx_session_model_usage_model",
+      "idx_session_model_usage_session",
+      "idx_session_turn_leases_expires",
+      "idx_sessions_effective_activity",
+      "idx_sessions_gateway_peer",
+      "idx_sessions_handoff_state",
+      "idx_sessions_parent",
+      "idx_sessions_session_key",
+      "idx_sessions_source",
+      "idx_sessions_source_id",
+      "idx_sessions_started",
+      "idx_sessions_system_prompt_hash",
+      "idx_sessions_title_unique",
+      "idx_sessions_tool_names"
+    ],
+    "view": [
+      "messages_fts_src",
+      "messages_fts_trigram_src"
+    ],
+    "trigger": [
+      "messages_display_identity_delete",
+      "messages_display_identity_update",
+      "messages_display_order_insert",
+      "messages_display_visibility_update",
+      "messages_fts_delete",
+      "messages_fts_insert",
+      "messages_fts_trigram_delete",
+      "messages_fts_trigram_insert",
+      "messages_fts_trigram_update",
+      "messages_fts_update",
+      "messages_message_uid_insert"
+    ]
+  },
+  "search": {
+    "unique_token_xyz": [
+      [
+        5,
+        "20261015_090500_b3c4d5"
+      ]
+    ]
+  },
+  "sessions": {
+    "20261015_090000_a1b2c3": {
+      "row": {
+        "id": "20261015_090000_a1b2c3",
+        "source": "cli",
+        "model": "glm-5.3-flash",
+        "message_count": 3,
+        "tool_call_count": 0,
+        "input_tokens": 120,
+        "output_tokens": 340,
+        "cache_read_tokens": 50,
+        "cache_write_tokens": 10,
+        "reasoning_tokens": 20,
+        "started_at": 1792083949.494315,
+        "ended_at": null,
+        "end_reason": null,
+        "billing_provider": "custom",
+        "billing_base_url": "http://127.0.0.1:20128/v1",
+        "billing_mode": "gateway",
+        "api_call_count": 2,
+        "estimated_cost_usd": 0.0012,
+        "parent_session_id": null,
+        "session_key": null,
+        "chat_id": null,
+        "chat_type": null,
+        "user_id": null
+      },
+      "messages": [
+        {
+          "id": 1,
+          "role": "user",
+          "content": "What files live in src/persistence?",
+          "timestamp": 1790000001.0,
+          "message_uid": "f0000000000000000000000000000000",
+          "token_count": 12,
+          "tool_call_id": null,
+          "tool_name": null,
+          "active": 1,
+          "compacted": 0
+        },
+        {
+          "id": 2,
+          "role": "assistant",
+          "content": "The persistence module ships a stock SQLite backend.",
+          "timestamp": 1790000002.5,
+          "message_uid": "e1111111111111111111111111111111",
+          "token_count": 34,
+          "tool_call_id": null,
+          "tool_name": null,
+          "active": 1,
+          "compacted": 0
+        },
+        {
+          "id": 3,
+          "role": "tool",
+          "content": "mod.rs\nstock_sqlite.rs\nsession_store.rs",
+          "timestamp": 1790000003.0,
+          "message_uid": "d2222222222222222222222222222222",
+          "token_count": 7,
+          "tool_call_id": "call_001",
+          "tool_name": "list_files",
+          "active": 1,
+          "compacted": 0
+        }
+      ]
+    },
+    "20261015_090500_b3c4d5": {
+      "row": {
+        "id": "20261015_090500_b3c4d5",
+        "source": "cli",
+        "model": "glm-5.3-flash",
+        "message_count": 2,
+        "tool_call_count": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0,
+        "reasoning_tokens": 0,
+        "started_at": 1792083950.2009983,
+        "ended_at": 1792083950.6041574,
+        "end_reason": "idle",
+        "billing_provider": null,
+        "billing_base_url": null,
+        "billing_mode": null,
+        "api_call_count": 0,
+        "estimated_cost_usd": null,
+        "parent_session_id": null,
+        "session_key": "tg:1003310984808:2",
+        "chat_id": "1003310984808",
+        "chat_type": "topic",
+        "user_id": "kara-test"
+      },
+      "messages": [
+        {
+          "id": 4,
+          "role": "user",
+          "content": "R\u00e9sum\u00e9 the FTS5 rebuild rules for me",
+          "timestamp": 1790001001.0,
+          "message_uid": "c3333333333333333333333333333333",
+          "token_count": 9,
+          "tool_call_id": null,
+          "tool_name": null,
+          "active": 1,
+          "compacted": 0
+        },
+        {
+          "id": 5,
+          "role": "assistant",
+          "content": "Deferred rebuilds gate trigger membership on fts_rebuild_high_water / fts_rebuild_progress markers; unique_token_xyz is findable.",
+          "timestamp": 1790001002.0,
+          "message_uid": "b4444444444444444444444444444444",
+          "token_count": 41,
+          "tool_call_id": null,
+          "tool_name": null,
+          "active": 1,
+          "compacted": 0
+        }
+      ]
+    },
+    "20261015_091000_c4d5e6": {
+      "row": {
+        "id": "20261015_091000_c4d5e6",
+        "source": "gateway",
+        "model": null,
+        "message_count": 1,
+        "tool_call_count": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0,
+        "reasoning_tokens": 0,
+        "started_at": 1792083950.7628646,
+        "ended_at": 1792083950.9391418,
+        "end_reason": "compression",
+        "billing_provider": null,
+        "billing_base_url": null,
+        "billing_mode": null,
+        "api_call_count": 0,
+        "estimated_cost_usd": null,
+        "parent_session_id": "20261015_090500_b3c4d5",
+        "session_key": "tg:1003310984808:2",
+        "chat_id": "1003310984808",
+        "chat_type": "topic",
+        "user_id": "kara-test"
+      },
+      "messages": [
+        {
+          "id": 6,
+          "role": "user",
+          "content": "compression-continuation probe",
+          "timestamp": 1790002001.0,
+          "message_uid": "a5555555555555555555555555555555",
+          "token_count": 5,
+          "tool_call_id": null,
+          "tool_name": null,
+          "active": 1,
+          "compacted": 0
+        }
+      ]
+    }
+  },
+  "state_db_sha256": "d87f3d306517a971ddd4d568e9bfbfaa60af6ae1dc1bdd73abf99b19b412f718"
+}
