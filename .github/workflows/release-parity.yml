@@ -1,0 +1,53 @@
+name: Release parity gate
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/upstream-releases/**'
+      - 'scripts/**'
+
+permissions:
+  contents: read
+
+jobs:
+  parity:
+    name: Parity fixtures (no network)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Parity gate fixture self-test (no network)
+        run: python3 tests/release_parity_test.py
+      - name: Regenerate parity report from committed snapshots (must be a no-op)
+        run: |
+          set -euo pipefail
+          if ! ls docs/upstream-releases/*.json > /dev/null 2>&1; then
+            echo "No committed snapshots; fixture self-test only."
+            exit 0
+          fi
+          # Documented default mode: newest snapshot drives PARITY.md;
+          # ledger appends are idempotent, so a current tree regenerates bytes.
+          python3 scripts/check_release_parity.py
+          if ! git diff --exit-code -- docs/upstream-releases/; then
+            echo "::error::PARITY.md / parity-ledger.md are not up to date with the committed snapshots. Run: scripts/check_release_parity.py"
+            exit 1
+          fi
+
+  rust:
+    name: Rust format, lint, and tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - name: Tests
+        run: cargo test --workspace --all-features
