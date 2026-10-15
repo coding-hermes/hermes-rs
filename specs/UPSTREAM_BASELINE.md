@@ -151,6 +151,15 @@ no measurement claim is made by this document. Hardware/OS/runtime are
 recorded from the baseline machine (`uname -a`, `nproc`,
 `python3 --version`, `/etc/os-release`, `/proc/cpuinfo`).
 
+> **SUPERSEDED (HRS-006, 2026-10-14).** The P1/P2 measurement records
+> below are retained as historical evidence of the first measurement pass
+> only — they are NOT the investment gate. Their cpu_s, rss_mb_end and
+> duration_seconds figures were produced by a flawed sampler (cumulative
+> `RUSAGE_CHILDREN` max-ed across thread workers; `max(rss)` published as
+> an "end" value; summed per-turn walls used as batch duration). The
+> corrected methodology and the valid records live in section 6 below
+> (`baseline/hrs006-*`, schema `hermes-rs/baseline/2`).
+
 ### Profile P1 — `single_session`
 
 - Description: single-session interactive agent loop; one conversation,
@@ -164,7 +173,8 @@ recorded from the baseline machine (`uname -a`, `nproc`,
   cpu_percent_avg 52.0, cpu_seconds_total 7.979, rss_mb_peak 52.6,
   latency p50/p95/p99 5093/5094/5162 ms,
   throughput 11.74 turns/min, turns 3/3 OK.
-  Authoritative per-run JSON: `baseline/hrs005-p1.json`
+  (SUPERSEDED — historical, not the investment gate) Per-run JSON:
+  `baseline/hrs005-p1.json`
   (schema `hermes-rs/baseline/1`, environment block included).
 - Measurement context: agent loop run end-to-end via the pinned checkout's
   `hermes -z` CLI against a real model (`ocg/glm-5.3-flash`) served by the
@@ -192,7 +202,8 @@ recorded from the baseline machine (`uname -a`, `nproc`,
   cpu_percent_avg 52.7, cpu_seconds_total 19.265, rss_mb_peak 52.6,
   latency p50/p95/p99 5878/6645/7266 ms,
   throughput 9.84 turns/min, turns 6/6 OK.
-  Authoritative per-run JSON: `baseline/hrs005-p2.json`.
+  (SUPERSEDED — historical, not the investment gate) Per-run JSON:
+  `baseline/hrs005-p2.json`.
 - Measurement context: identical machine and provider as P1; same
   end-to-end caveat (provider latency included; CPU% undercounts
   concurrent overlap because it divides cumulative child CPU by summed
@@ -236,7 +247,79 @@ recorded because they change how any future full run must be invoked:
   3.14 for managed installs; the reference-environment choice for paired
   runs must be recorded per run).
 
-## 5. Provenance
+## 6. Corrected methodology (HRS-006)
+
+HRS-006 repaired the measurement harness (`scripts/measure_baseline.py`)
+because the HRS-005 numbers above were not a valid gate for a Rust-rewrite
+investment. Nothing in this section makes a Python-vs-Rust efficiency
+claim; everything below is local compute/resource measurement of the
+pinned Python reference (v0.22.0 @ `e06df9c2`,
+`/tmp/hermes-upstream-pin-hrs001`).
+
+### 6.1 Defects fixed
+
+| HRS-005 defect | Consequence | HRS-006 fix |
+|---|---|---|
+| `cpu_s` from `resource.getrusage(RUSAGE_CHILDREN)` (cumulative over the whole harness process lifetime), then `max()` across thread workers | CPU under-counted and misattributed under concurrency | Per-turn process-tree CPU delta: `/proc/<pid>/stat` `utime+stime` summed over the spawned process AND all descendants (PPid walk each tick), first-vs-last sample delta per turn, summed over the batch (`cpu_method` field in every JSON) |
+| `rss_mb_end = max(rss)` | Published a PEAK as an end value | `rss_mb_end` = final tree sample (sum of `/proc/<pid>/statm` resident pages across the tree at the last tick before exit) of the last-finishing turn; peak stays max tick sum |
+| `duration_seconds` = sum of per-turn walls | Inflated/deflated throughput under concurrency | `duration_seconds` = `time.monotonic` elapsed around the whole concurrent batch; per-turn walls kept for latency percentiles only. `measurements.wall_sum_over_batch` in each rep file exposes the ratio so the old error is visible |
+| p95 nearest-rank on tiny n, undocumented | Silent small-sample publishing | Nearest-rank documented in JSON (`latency_percentile_method`); `low_sample: true` + note on every percentile field while n<20 |
+| Sampler unvalidated | Numbers could be wrong with no way to know | `--selftest`: synthetic child allocates ~200 MB (pages touched), spins ~2.0 s CPU, spawns a grandchild spinning ~0.5 s; sampler must report CPU within ±0.5 s of 2.5 s and RSS within ±25% of 200 MB. Prints PASS/FAIL, exits nonzero on fail; a capture refuses to run after a selftest FAIL; every capture JSON records `sampler_selftest` (+ details) |
+
+### 6.2 Workload profiles (deterministic, provider-backed)
+
+All profiles run the pinned checkout's real agent loop via
+`uv run hermes -z <prompt> -m <model> --provider 9router` with an isolated
+`HERMES_HOME` per session and `ROUTER_API_KEY` from the environment (never
+logged). Each rep batch spawns `concurrency` sessions that each run their
+scripted turns sequentially; reps repeat the whole batch. New records use
+schema `hermes-rs/baseline/2`; the schema-`1` HRS-005 files above remain
+on disk untouched as history.
+
+- `continuing_conversation` — N scripted follow-up turns against the SAME
+  session. Turn 1 plants a codeword; later turns resume that session —
+  preferred via `--resume <session-id>` (the id is read from the home's
+  session store right after turn 0), with bare `-c` (MRU) as fallback.
+  **Continuation semantics:** "continuing" = every turn after the first
+  attaches to the same session; it is verified per turn by codeword
+  recall, not assumed — a turn whose output lacks the marker is marked
+  not-ok with `ok_reason=expected_marker_missing_from_output`. Explicit
+  ids are preferred because the pin's exit-time `last_activity_at` write
+  is occasionally lost under load, which empties the `-c` MRU lookup
+  while session content stays intact (observed live in a c4 rep; the
+  harness also retries one turn after a bounded finalize wait).
+- `tool_execution` — each turn plants a random-hex token file inside the
+  session home and instructs the agent to `cat` it with its terminal tool;
+  the turn counts ok only if the random token appears in the output (the
+  model cannot guess it), so a turn only passes if a real tool ran.
+- `sqlite_persistence` — turns that write session state and recall it
+  (plant + recall codeword) so the SQLite session store grows; the
+  harness measures `HERMES_HOME` byte growth (du-equivalent) before/after
+  each batch and reports `storage_growth_mb`.
+
+Each profile runs at concurrency 1 and concurrency 4, with reps ≥ 5
+(reps = repeated batches). Per profile: one raw JSON per rep plus a
+summary JSON with mean/stddev/min/max over reps for wall_s, cpu_s,
+rss_mb_peak, rss_mb_end, throughput and storage growth.
+
+### 6.3 HRS-006 capture record (live, this host)
+
+- Provider: 9router (`localhost:20128`), model `ocg/glm-5.3-flash`;
+  end-to-end wall times include provider/network latency.
+- Environment: Ubuntu 26.04.1 LTS, kernel 7.0.0-31-generic, AMD Ryzen 7
+  7840HS, 16 logical CPUs; CPython 3.11.15 (harness).
+- Sampler selftest before capture: PASS (recorded in every JSON).
+- Records: `baseline/hrs006-continuing_conversation-c{1,4}-rep*.json` +
+  `baseline/hrs006-continuing_conversation-c{1,4}-summary.json` — both
+  cells captured live in one session (5 reps × 3 turns each; c1 = 1
+  session/rep, c4 = 4 concurrent sessions/rep); file names carry the
+  concurrency and rep. Null contract (DF-HRS-102): every null is
+  `{"value": null, "reason": ...}` or carries a sibling `<field>_reason`.
+- Separation rule: these are local measurements of the pinned PYTHON
+  reference only. No Python-vs-Rust efficiency claim is made anywhere in
+  this document.
+
+## 7. Provenance
 
 - Pin made 2026-10-14 (UTC) by this task (HRS-001) from this machine:
   `git ls-remote --tags` listed all tags; GitHub API

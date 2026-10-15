@@ -1,0 +1,242 @@
+{
+  "schema": "hermes-rs/baseline/2",
+  "profile": "continuing_conversation",
+  "environment": {
+    "uname": "Linux karaHermes-mde-7840hs 7.0.0-31-generic x86_64",
+    "kernel": "7.0.0-31-generic",
+    "arch": "x86_64",
+    "os_release": "Ubuntu 26.04.1 LTS",
+    "cpu_count": 16,
+    "cpu_model": "AMD Ryzen 7 7840HS w/ Radeon 780M Graphics",
+    "python_version": "3.11.15",
+    "captured_at": "2026-10-14T23:49:40+00:00"
+  },
+  "workload": {
+    "concurrency": 4,
+    "sessions_per_rep": 4,
+    "turns_per_session": 3,
+    "reps": 5,
+    "model": "ocg/glm-5.3-flash",
+    "provider": "9router (localhost:20128 federation gateway)",
+    "pin": "v0.22.0 @ e06df9c2eae6901f4c88f464e0ae6e753c0428b8",
+    "pin_path": "/tmp/hermes-upstream-pin-hrs001",
+    "pin_verified": true,
+    "pin_note": "verified v0.22.0 @ e06df9c2eae6901f4c88f464e0ae6e753c0428b8",
+    "hermes_argv_template": "uv run hermes -z <prompt> -m <model> --provider 9router [-c on turns>0]",
+    "profile_prompts": {
+      "continuing_conversation": [
+        "Remember this codeword for the rest of this conversation: LANTERN-7. Reply with exactly: acknowledged.",
+        "What codeword did I ask you to remember earlier in this conversation? Reply with the codeword only.",
+        "Reply with exactly: LANTERN-7 session check complete."
+      ],
+      "sqlite_persistence": [
+        "Remember this token for the rest of this conversation: ZEPHYR-31. Reply with exactly: stored.",
+        "Recall the token I asked you to remember earlier in this conversation and reply with exactly that token.",
+        "Recall the token again and reply with exactly: ZEPHYR-31 recalled."
+      ],
+      "tool_execution": "per turn: random token file planted in the session home; agent told to `cat <abs path>` and echo its output"
+    }
+  },
+  "sampler_selftest": "pass",
+  "sampler_selftest_details": {
+    "expected_cpu_s": 2.5,
+    "expected_rss_mb": 200.0,
+    "measured_cpu_s": 2.45,
+    "measured_rss_peak_mb": 231.5,
+    "ticks": 10,
+    "child_wall_s": 2.663,
+    "fail_reason": ""
+  },
+  "method": {
+    "cpu": "per-turn process-tree CPU delta (see cpu_method in measurements); replaces HRS-005's cumulative RUSAGE_CHILDREN max() which misattributed CPU under concurrency",
+    "wall": "duration_seconds = batch elapsed monotonic wall clock; per-turn walls kept for latency percentiles only",
+    "rss": "rss_mb_peak = max tree tick sum; rss_mb_end = final tree sample of the last-finishing turn (HRS-005 wrongly published peak as end)",
+    "latency_percentiles": "nearest-rank; low_sample flag when n<20",
+    "storage": "du-equivalent byte sum over each session HERMES_HOME tree before/after the batch (sqlite_persistence only)",
+    "continuing_semantics": "continuing = every turn after the first resumes the SAME session via `hermes -z <prompt> -c` (MRU session inside the turn's isolated HERMES_HOME); continuation is VERIFIED per turn by codeword recall, not assumed",
+    "null_contract": "every null is {value: null, reason: ...} or carries a sibling <field>_reason key (DF-HRS-102)"
+  },
+  "notes": "Measured against the pinned Python reference via its real agent loop; provider/network latency is included (end-to-end, not compute-only). Local compute/resource measurement ONLY - this record makes no Python-vs-Rust compatibility or efficiency claim.",
+  "rep": 3,
+  "captured_at": "2026-10-14T23:54:23.869382+00:00",
+  "measurements": {
+    "duration_seconds": 76.576,
+    "wall_clock_method": "time.monotonic elapsed around the whole concurrent batch (NOT the sum of per-turn walls)",
+    "per_turn_wall_sum_s": 214.172,
+    "wall_sum_over_batch": 2.797,
+    "cpu_seconds_total": 25.2,
+    "cpu_method": "per-turn process-tree delta of /proc/<pid>/stat utime+stime (CLK_TCK=100 jiffies/s), sampled every 0.25s over the spawned process and all descendants (PPid walk); cumulative for any process alive at >=1 tick; sub-tick startup/teardown CPU is under-counted",
+    "cpu_turns_without_samples": 0,
+    "cpu_percent_avg": 32.9,
+    "rss_mb_peak": 248.9,
+    "rss_mb_peak_reason": null,
+    "rss_mb_end": {
+      "value": 248.9,
+      "method_note": "final tree sample of the last-finishing turn (concurrency=4); at concurrency 1 this is the batch tree's end sample"
+    },
+    "rss_method": "sum of /proc/<pid>/statm resident pages x page size across the process tree each 0.25s tick; peak = max tick sum; end = last tick sum before exit",
+    "latency_p50_ms": {
+      "value": 7051.8,
+      "low_sample": true,
+      "note": "nearest-rank over n=12 turns (<20)"
+    },
+    "latency_p95_ms": {
+      "value": 38301.2,
+      "low_sample": true,
+      "note": "nearest-rank over n=12 turns (<20)"
+    },
+    "latency_p99_ms": {
+      "value": 38301.2,
+      "low_sample": true,
+      "note": "nearest-rank over n=12 turns (<20)"
+    },
+    "latency_percentile_method": "nearest-rank over per-turn wall seconds of successful turns (falls back to all turns when none succeeded)",
+    "latency_sample_count": 12,
+    "throughput_turns_per_min": 9.4,
+    "storage_growth_mb": {
+      "value": null,
+      "reason": "storage_growth_only_measured_for_sqlite_persistence"
+    }
+  },
+  "turns_detail": [
+    {
+      "ok": true,
+      "wall_s": 38.30117300990969,
+      "cpu_s": 2.54,
+      "cpu_ticks": 124,
+      "rss_mb_peak": 248.9,
+      "rss_mb_end": 248.9,
+      "output_tail": "acknowledged.\n\n(Code word noted: LANTERN-7 \u2014 in effect for the rest of this conversation.)\n",
+      "session": 0,
+      "turn": 0
+    },
+    {
+      "ok": true,
+      "wall_s": 7.0517781840171665,
+      "cpu_s": 2.15,
+      "cpu_ticks": 26,
+      "rss_mb_peak": 244.6,
+      "rss_mb_end": 244.6,
+      "output_tail": "LANTERN-7\n",
+      "session": 0,
+      "turn": 1
+    },
+    {
+      "ok": true,
+      "wall_s": 6.388121737865731,
+      "cpu_s": 2.09,
+      "cpu_ticks": 24,
+      "rss_mb_peak": 246.2,
+      "rss_mb_end": 242.6,
+      "output_tail": "LANTERN-7 session check complete.\n",
+      "session": 0,
+      "turn": 2
+    },
+    {
+      "ok": true,
+      "wall_s": 35.58154018991627,
+      "cpu_s": 2.74,
+      "cpu_ticks": 115,
+      "rss_mb_peak": 248.5,
+      "rss_mb_end": 248.5,
+      "output_tail": "acknowledged.\n",
+      "session": 1,
+      "turn": 0
+    },
+    {
+      "ok": true,
+      "wall_s": 6.335020232014358,
+      "cpu_s": 1.97,
+      "cpu_ticks": 23,
+      "rss_mb_peak": 247.1,
+      "rss_mb_end": 244.8,
+      "output_tail": "LANTERN-7\n",
+      "session": 1,
+      "turn": 1
+    },
+    {
+      "ok": true,
+      "wall_s": 6.428541237022728,
+      "cpu_s": 2.19,
+      "cpu_ticks": 24,
+      "rss_mb_peak": 241.9,
+      "rss_mb_end": 51.7,
+      "output_tail": "LANTERN-7 session check complete.\n",
+      "session": 1,
+      "turn": 2
+    },
+    {
+      "ok": true,
+      "wall_s": 34.183759783161804,
+      "cpu_s": 2.76,
+      "cpu_ticks": 111,
+      "rss_mb_peak": 243.7,
+      "rss_mb_end": 38.3,
+      "output_tail": "acknowledged\n",
+      "session": 2,
+      "turn": 0
+    },
+    {
+      "ok": true,
+      "wall_s": 6.791680288035423,
+      "cpu_s": 1.9,
+      "cpu_ticks": 25,
+      "rss_mb_peak": 242.3,
+      "rss_mb_end": 242.3,
+      "output_tail": "LANTERN-7\n",
+      "session": 2,
+      "turn": 1
+    },
+    {
+      "ok": true,
+      "wall_s": 6.621564242057502,
+      "cpu_s": 0.07,
+      "cpu_ticks": 25,
+      "rss_mb_peak": 241.7,
+      "rss_mb_end": 0.0,
+      "output_tail": "LANTERN-7 session check complete.\n",
+      "session": 2,
+      "turn": 2
+    },
+    {
+      "ok": true,
+      "wall_s": 38.19370561907999,
+      "cpu_s": 2.78,
+      "cpu_ticks": 124,
+      "rss_mb_peak": 243.9,
+      "rss_mb_end": 50.3,
+      "output_tail": "acknowledged\n",
+      "session": 3,
+      "turn": 0
+    },
+    {
+      "ok": true,
+      "wall_s": 16.52343428414315,
+      "cpu_s": 2.08,
+      "cpu_ticks": 61,
+      "rss_mb_peak": 245.8,
+      "rss_mb_end": 245.8,
+      "output_tail": "LANTERN-7\n",
+      "session": 3,
+      "turn": 1
+    },
+    {
+      "ok": true,
+      "wall_s": 11.771194465924054,
+      "cpu_s": 1.93,
+      "cpu_ticks": 44,
+      "rss_mb_peak": 242.3,
+      "rss_mb_end": 242.3,
+      "output_tail": "LANTERN-7 session check complete.\n",
+      "session": 3,
+      "turn": 2
+    }
+  ],
+  "turns_ok": "12/12",
+  "session_homes": [
+    "/tmp/hrs006-homes4/continuing_conversation-c4-rep03-s0",
+    "/tmp/hrs006-homes4/continuing_conversation-c4-rep03-s1",
+    "/tmp/hrs006-homes4/continuing_conversation-c4-rep03-s2",
+    "/tmp/hrs006-homes4/continuing_conversation-c4-rep03-s3"
+  ]
+}
