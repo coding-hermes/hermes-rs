@@ -1,4 +1,7 @@
-//! Minimal foundation crate; project functionality is not implemented yet.
+//! Foundation crate. HRS-010 adds the session-store persistence slice
+//! (specs/persistence-shim.md §6) behind the HRS-002 boundary.
+
+pub mod persistence;
 
 /// Returns the current project-stage label for the command-line scaffold.
 pub fn scaffold_status() -> &'static str {

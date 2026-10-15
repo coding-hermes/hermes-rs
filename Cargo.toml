@@ -16,3 +16,11 @@ path = "src/lib.rs"
 [[bin]]
 name = "hermes-rs"
 path = "src/main.rs"
+
+# HRS-010 session-store vertical slice: stock SQLite backend.
+# `bundled` pins libsqlite3 (FTS5 + trigram tokenizer enabled in the
+# amalgamation) so file-format behavior does not drift with the host
+# libsqlite3. No alternative engine is linked (HRS-009 deferred).
+[dependencies]
+rusqlite = { version = "0.40", features = ["bundled", "backup", "functions"] }
+regex = "1"
