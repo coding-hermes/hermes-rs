@@ -1,0 +1,695 @@
+{
+  "schema": "hermes-rs/test-classification-manifest",
+  "version": 1,
+  "generated_by": "hrs007",
+  "upstream": {
+    "repo": "NousResearch/hermes-agent",
+    "tag": "v0.22.0",
+    "commit": "e06df9c2eae6901f4c88f464e0ae6e753c0428b8",
+    "checkout": "/tmp/hermes-upstream-pin-hrs001",
+    "checkout_head_verified": "e06df9c2eae6901f4c88f464e0ae6e753c0428b8"
+  },
+  "scope": {
+    "roots": [
+      "tests/providers/",
+      "tests/conformance/"
+    ],
+    "test_files": 21,
+    "note": "Scoped subset per specs/UPSTREAM_BASELINE.md section 5 (HRS-001 scoped run: providers + conformance, 21 test files). The full 5,724-file suite is out of scope for a single classification pass."
+  },
+  "collection_env": {
+    "python": "3.14.5 (pinned checkout .venv)",
+    "pytest": "9.1.1",
+    "pytest_asyncio": "1.3.0",
+    "collection_command": [
+      "HERMES_HOME=<isolated> .venv/bin/python -m pytest --collect-only -q",
+      "tests/providers/ tests/conformance/ -p no:cacheprovider"
+    ]
+  },
+  "harness_sha": "e06df9c2eae6901f4c88f464e0ae6e753c0428b8",
+  "totals": {
+    "collected": 91,
+    "classified": 91,
+    "by_class": {
+      "observable": 57,
+      "python-internal": 21,
+      "platform-host": 13,
+      "provider-live": 0,
+      "explicitly-excluded": 0
+    }
+  },
+  "reconciliation": {
+    "arithmetic": "counts.by_class sums to totals.classified == totals.collected == len(cases)",
+    "checks": {
+      "sum_by_class_equals_total": true,
+      "cases_listed_equals_total": true,
+      "ids_unique": true
+    }
+  },
+  "class_vocabulary": {
+    "observable": "pass/fail computable from adapter-visible I/O (request kwargs, registry/filesystem state, local fake servers)",
+    "python-internal": "verifies Python process/import/registry-cache semantics with no cross-language observation point",
+    "platform-host": "outcome depends on OS process semantics (SIGKILL, process races, journal-mode resolution) beyond an adapter boundary",
+    "provider-live": "contacts an external provider API without a local fake (none in this subset)",
+    "explicitly-excluded": "excluded from paired runs with a recorded reason (e.g. upstream skip conditions)"
+  },
+  "cases": [
+    {
+      "id": "tests/providers/test_auth_registry_import_order.py::test_tui_import_exposes_auth_registry_to_provider_plugins",
+      "class": "python-internal",
+      "evidence": "spawns a fresh CPython child importing hermes_cli.auth + a Python plugin file; verifies import-order semantics",
+      "adapter_note": "Subprocess contract (HERMES_HOME, PYTHONPATH, cwd) is documented for the adapter; the import-order verdict itself has no cross-language observation point.",
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_auth_registry_mid_discovery.py::test_plugins_discovered_after_auth_import_resolve",
+      "class": "python-internal",
+      "evidence": "subprocess runs Python probe asserting PROVIDER_REGISTRY rows after import-order-dependent discovery",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_auth_registry_mid_discovery.py::test_post_discovery_registration_is_mirrored",
+      "class": "python-internal",
+      "evidence": "monkeypatches providers._discover_entry_point_providers and module-level registry state; asserts Python dict mirroring",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_auth_registry_mid_discovery.py::test_user_plugin_alias_repoints_and_display_name_follows",
+      "class": "python-internal",
+      "evidence": "monkeypatches _current_source/_BUNDLED_PLUGINS_DIR; asserts in-process alias/display-name precedence",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_e2e_wiring.py::TestNvidiaProfileWiring::test_nvidia_tool_messages_drop_name_fields",
+      "class": "observable",
+      "evidence": "ChatCompletionsTransport.build_kwargs(...) on in-process transport; asserts exact tool-message dict; no network",
+      "adapter_note": "Direct adapter target: input messages + profile -> expected request kwargs.",
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_e2e_wiring.py::TestDeepSeekProfileWiring::test_deepseek_no_forced_max_tokens",
+      "class": "observable",
+      "evidence": "build_kwargs asserts max_tokens absent for deepseek profile; pure function of inputs",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_entry_point_discovery.py::test_entry_point_callable_and_module_targets",
+      "class": "python-internal",
+      "evidence": "monkeypatches importlib.metadata.entry_points; verifies Python entry-point registration semantics",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_entry_point_discovery.py::test_entry_point_not_enabled_is_skipped",
+      "class": "python-internal",
+      "evidence": "same in-process monkeypatched entry_points; enabled/disable set semantics are Python plugin-loader state",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_entry_point_discovery.py::test_entry_point_disabled_wins_over_enabled",
+      "class": "python-internal",
+      "evidence": "in-process monkeypatched entry_points; disable-over-enable precedence in the Python loader",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_entry_point_discovery.py::test_general_plugin_register_ctx_not_invoked",
+      "class": "python-internal",
+      "evidence": "in-process entry-point fake; asserts register(ctx) call convention of the Python plugin loader",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_entry_point_discovery.py::test_entry_point_failure_is_isolated",
+      "class": "python-internal",
+      "evidence": "in-process entry-point fake raising inside one target; asserts loader isolation behavior",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_entry_point_discovery.py::test_filesystem_plugins_win_over_entry_points",
+      "class": "python-internal",
+      "evidence": "in-process fakes for both discovery layers; precedence asserted on Python registry state",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_fetch_models_base_url.py::TestFetchModelsBaseUrlOverride::test_base_url_override_used",
+      "class": "observable",
+      "evidence": "profile.fetch_models() against a local 127.0.0.1 HTTPServer fake returning a models JSON; asserts selected URL + result",
+      "adapter_note": "Local fake server is adapter-reproducible: request URL/headers in, model list out.",
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_fetch_models_base_url.py::TestFetchModelsBaseUrlOverride::test_custom_base_url_beats_models_url",
+      "class": "observable",
+      "evidence": "same local fake server; custom base_url precedence in fetch_models URL selection",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_fetch_models_base_url.py::TestFetchModelsBaseUrlOverride::test_default_base_url_does_not_shadow_models_url",
+      "class": "observable",
+      "evidence": "same local fake server; default base_url must not shadow the /models URL",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_fetch_models_base_url.py::TestCustomProviderBaseUrlPassthrough::test_custom_passes_base_url",
+      "class": "observable",
+      "evidence": "CustomProfile.fetch_models against local fake server (base_url 127.0.0.1:1 override); pure request/response contract",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_fetch_models_base_url.py::TestFetchModelsRedirectCredentialStripping::test_cross_host_redirect_strips_credentials",
+      "class": "observable",
+      "evidence": "two local HTTPServers; 302 cross-host redirect; asserts credential headers stripped on follow",
+      "adapter_note": "HTTP redirect credential policy is observable wire behavior.",
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_fetch_models_base_url.py::TestFetchModelsRedirectCredentialStripping::test_same_origin_redirect_keeps_credentials",
+      "class": "observable",
+      "evidence": "same local-redirect rig; same-origin keeps authorization + x-api-key headers",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_fetch_models_base_url.py::TestModelPickerBaseUrlIntegration::test_picker_passes_base_url",
+      "class": "python-internal",
+      "evidence": "MagicMock profile + patched hermes_cli.auth resolver; asserts a Python call kwarg inside hermes_cli.models picker",
+      "adapter_note": "The observation point is a mocked Python-internal call, not adapter-visible I/O.",
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_fetch_models_base_url.py::test_profiles_without_model_listing_never_hit_the_network",
+      "class": "observable",
+      "evidence": "patched open_credentialed_url opener must never be called; fetch_models returns None for no-listing profiles",
+      "adapter_note": "Observable as 'no request issued' + None return; assert_not_called is adapter-reproducible as zero requests seen.",
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_installed_plugin_discovery.py::test_flat_installed_model_provider_plugins_are_discovered_alongside_nested_ones",
+      "class": "observable",
+      "evidence": "writes real plugin dirs under isolated HERMES_HOME; asserts discovered profiles incl. base_url/auth_type/env_vars",
+      "adapter_note": "Filesystem-layout -> registry outcome is adapter-observable.",
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_installed_plugin_discovery.py::test_other_plugins_in_the_flat_directory_are_left_to_the_plugin_manager",
+      "class": "observable",
+      "evidence": "non-model-provider dirs under plugins/ must not become provider profiles; registry-state assertion",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_meta_ai_profile.py::TestMetaAIProfile::test_images_ride_user_turns_not_tool_results",
+      "class": "observable",
+      "evidence": "get_provider_profile('meta-ai').prepare_messages/_build kwargs path; message-shape assertion, no network",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_meta_ai_profile.py::TestMetaAIProfile::test_live_catalog_filters_non_chat_models",
+      "class": "observable",
+      "evidence": "monkeypatched ProviderProfile.fetch_models fake returns mixed catalog; asserts chat-only filtering",
+      "adapter_note": "Filter is a pure function of a fetched list; the fetch itself is faked in-process.",
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_meta_ai_profile.py::TestReasoningEffort::test_mapping",
+      "class": "observable",
+      "evidence": "pure mapping function reasoning-effort -> provider field values",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_meta_ai_profile.py::TestReasoningEffort::test_never_uses_extra_body",
+      "class": "observable",
+      "evidence": "asserts mapping never lands reasoning in extra_body; pure kwargs assertion",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_named_custom_reasoning.py::test_bare_named_custom_provider_gets_custom_profile",
+      "class": "python-internal",
+      "evidence": "monkeypatches providers._REGISTRY/_ALIASES/_PROVIDER_LIST_CACHE module singletons; in-process lookup semantics",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_named_custom_reasoning.py::test_named_custom_route_keeps_final_reasoning_effort",
+      "class": "observable",
+      "evidence": "transport.build_kwargs for custom/custom:<name> profiles with reasoning_config effort low/medium/high; pure kwargs assertion (base_url points at a dead 127.0.0.1:1 port, no network)",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_named_custom_reasoning.py::test_named_custom_fallback_does_not_override_registered_routes",
+      "class": "python-internal",
+      "evidence": "same module-singleton monkeypatching; fallback precedence on Python registry state",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_named_custom_reasoning.py::test_bare_named_custom_memo_caches_the_helper_result",
+      "class": "python-internal",
+      "evidence": "asserts a memoization counter via monkeypatched helper; Python caching mechanics",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_named_custom_reasoning.py::test_bare_named_custom_memo_invalidates_on_config_change",
+      "class": "python-internal",
+      "evidence": "memo invalidation keyed on Python config module state",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_named_custom_reasoning.py::test_bare_named_custom_memo_is_keyed_by_home",
+      "class": "python-internal",
+      "evidence": "memo keyed by HERMES_HOME value; in-process cache-key semantics",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_oauth_pkce_plugin.py::test_pkce_handler_add_status_refresh_logout_against_fake_idp",
+      "class": "observable",
+      "evidence": "tests/providers/fake_pkce_idp.py: local 127.0.0.1 HTTPServer IdP (PKCE S256 verified); real HTTP flow, webbrowser/open + browser check monkeypatched",
+      "adapter_note": "Loopback IdP is adapter-reproducible; the OAuth client behavior (authorize URL, code exchange, refresh, logout) is observable wire behavior.",
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_oauth_pkce_plugin.py::test_token_url_off_authorize_allowlist_refused_before_any_request",
+      "class": "observable",
+      "evidence": "httpx.post monkeypatched to raise; asserts no token endpoint contact off-allowlist; observable as zero requests + refusal",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_oauth_pkce_plugin.py::test_spent_refresh_token_is_grant_dead_and_marks_the_pool_row_dead",
+      "class": "observable",
+      "evidence": "fake IdP rotates refresh tokens (old -> 400); asserts grant-dead handling + pool row state on disk",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_oauth_pkce_plugin.py::test_alias_login_stores_the_row_under_the_canonical_profile_name",
+      "class": "observable",
+      "evidence": "fake IdP login via alias name; asserts stored pool row keyed by canonical profile name",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_plugin_discovery.py::test_bundled_plugins_discovered",
+      "class": "observable",
+      "evidence": "reads the checkout's bundled plugins/model-providers tree; asserts discovered profile set",
+      "adapter_note": "Filesystem -> registry outcome; adapter runs against the same plugin corpus.",
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_plugin_discovery.py::test_all_profiles_register",
+      "class": "observable",
+      "evidence": "every discovered profile registers and resolves via get_provider_profile",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_plugin_discovery.py::test_user_plugin_overrides_bundled",
+      "class": "observable",
+      "evidence": "isolated HERMES_HOME plugin tree overrides bundled plugin of same name; registry assertion",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_profile_home_layers.py::test_secondary_profile_plugin_resolves_for_its_home_only",
+      "class": "observable",
+      "evidence": "two isolated HERMES_HOMEs with plugin trees; profile-scoped resolution asserted on registry state",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_profile_home_layers.py::test_plugin_installed_after_discovery_is_found_without_a_restart",
+      "class": "observable",
+      "evidence": "plugin dir added after first discovery; re-resolution observed on registry state",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_profile_wiring.py::TestNvidiaProfileParity::test_max_tokens_match",
+      "class": "observable",
+      "evidence": "transport.build_kwargs parity pin for nvidia profile; pure kwargs assertion",
+      "adapter_note": "Core adapter target family: profile + inputs -> exact request kwargs.",
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_profile_wiring.py::TestKimiProfileParity::test_temperature_omitted",
+      "class": "observable",
+      "evidence": "kimi profile must omit temperature; kwargs assertion",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_profile_wiring.py::TestDeveloperRoleParity::test_legacy_path_swaps_for_gpt5",
+      "class": "observable",
+      "evidence": "developer-role rewrite for gpt-5 models, legacy flag path; kwargs assertion",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_profile_wiring.py::TestDeveloperRoleParity::test_profile_path_swaps_for_gpt5",
+      "class": "observable",
+      "evidence": "same rewrite via provider profile path; kwargs assertion",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_profile_wiring.py::TestRequestOverridesParity::test_extra_body_override_legacy",
+      "class": "observable",
+      "evidence": "request_overrides landing in extra_body, legacy path; kwargs assertion",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_profile_wiring.py::TestRequestOverridesParity::test_top_level_override",
+      "class": "observable",
+      "evidence": "top-level override keys land top-level; kwargs assertion",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_provider_profiles.py::TestOpenRouterProfile::test_sticky_session_id_normalizes_cron_timestamp",
+      "class": "observable",
+      "evidence": "sticky-session header construction normalizing cron timestamps; header/kwargs assertion",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_provider_profiles.py::TestOpenRouterProfile::test_pareto_min_coding_score_emitted_for_pareto_model",
+      "class": "observable",
+      "evidence": "conditional scoring header for pareto models; kwargs assertion",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_provider_profiles.py::TestOpenRouterProfile::test_grok_session_id_sets_cache_affinity_header",
+      "class": "observable",
+      "evidence": "cache-affinity header wiring; kwargs assertion",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_provider_profiles.py::TestOpenRouterProfile::test_grok_conv_id_normalizes_cron_timestamp",
+      "class": "observable",
+      "evidence": "conversation-id normalization in headers; kwargs assertion",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_provider_profiles.py::TestOpenRouterProfile::test_mandatory_anthropic_verbosity_coexists_with_grok_header",
+      "class": "observable",
+      "evidence": "verbosity param + grok header coexistence; kwargs assertion",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_provider_profiles.py::TestOpenRouterProfile::test_speed_tier_slugs_pin_endpoints_and_rewrite_wire_model",
+      "class": "observable",
+      "evidence": "speed-tier slug -> endpoint pinning + wire-model rewrite; kwargs/URL assertion",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_provider_profiles.py::TestNousProfile::test_sticky_session_id_normalizes_cron_timestamp",
+      "class": "observable",
+      "evidence": "nous sticky-session header normalization; kwargs assertion",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_provider_profiles.py::TestNousProfile::test_extra_body_ignores_provider_preferences",
+      "class": "observable",
+      "evidence": "nous ignores provider preferences in extra_body; kwargs assertion",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_provider_profiles.py::TestQwenProfile::test_prepare_messages_protects_nested_image_url_retry_mutation",
+      "class": "observable",
+      "evidence": "prepare_messages must not mutate nested image_url structures across retries; message-shape assertion",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_provider_profiles.py::TestAlibabaRegionalAndTokenPlanProfiles::test_cn_variants_resolve_in_auth_registry",
+      "class": "python-internal",
+      "evidence": "monkeypatched credential env vars; asserts auth-registry rows for CN variants - Python auth-registry resolution",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_provider_registry.py::test_list_providers_reuses_cached_snapshot_until_registration_changes",
+      "class": "python-internal",
+      "evidence": "module-level _PROVIDER_LIST_CACHE snapshot/copy semantics; Python cache mechanics",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_provider_registry.py::test_list_providers_dedupes_aliases_in_cached_snapshot",
+      "class": "python-internal",
+      "evidence": "alias dedupe on the module-level cached snapshot",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_provider_registry.py::test_provider_lookups_reuse_the_home_plugin_stamp_within_its_ttl",
+      "class": "python-internal",
+      "evidence": "monkeypatched _plugin_dir_stamps/_scan_home_layer; TTL stamp mechanics of the Python resolver",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_provider_registry.py::test_api_key_profiles_declare_their_registry_key_env",
+      "class": "observable",
+      "evidence": "declared env_vars must contain the registry key env for api_key profiles; invariant over registry rows",
+      "adapter_note": "Invariant over registry content, which the adapter materializes.",
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_transport_parity.py::TestNvidiaParity::test_user_max_tokens_overrides",
+      "class": "observable",
+      "evidence": "nvidia max_tokens override semantics pinned via build_kwargs; pure kwargs assertion",
+      "adapter_note": "Adapter target family.",
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_transport_parity.py::TestKimiParity::test_thinking_enabled",
+      "class": "observable",
+      "evidence": "xor contract: reasoning_effort only, never paired with extra_body.thinking; kwargs assertion",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_transport_parity.py::TestOpenRouterParity::test_provider_preferences",
+      "class": "observable",
+      "evidence": "provider preferences land in extra_body.provider; kwargs assertion",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_transport_parity.py::TestNousParity::test_tags",
+      "class": "observable",
+      "evidence": "nous portal tags in extra_body.tags; kwargs assertion",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_transport_parity.py::TestQwenParity::test_vl_high_resolution",
+      "class": "observable",
+      "evidence": "qwen vl_high_resolution_images flag in extra_body; kwargs assertion",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_transport_parity.py::TestQwenParity::test_metadata_top_level",
+      "class": "observable",
+      "evidence": "qwen metadata at top level, not extra_body; kwargs assertion",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_transport_parity.py::TestCustomOllamaParity::test_ollama_num_ctx",
+      "class": "observable",
+      "evidence": "ollama num_ctx in extra_body.options; kwargs assertion",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_transport_parity.py::TestCustomOllamaParity::test_think_false_when_disabled",
+      "class": "observable",
+      "evidence": "think=false for local custom endpoint when reasoning disabled; kwargs assertion",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/providers/test_transport_parity.py::TestCustomOllamaParity::test_think_omitted_for_mistral_custom",
+      "class": "observable",
+      "evidence": "think omitted for https custom (mistral) endpoint; kwargs assertion",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/conformance/persistence/test_cell1_prefix_durability.py::test_acknowledged_appends_survive_sigkill[None]",
+      "class": "platform-host",
+      "evidence": "real SIGKILL to a child OS process mid-append; on-disk prefix durability of SQLite journal",
+      "adapter_note": "Contract transfers (acknowledged prefix survives crash); adapter runs its own equivalent against the Rust store.",
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/conformance/persistence/test_cell1_prefix_durability.py::test_acknowledged_appends_survive_sigkill[DELETE]",
+      "class": "platform-host",
+      "evidence": "same cell pinned to explicit DELETE journal mode",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/conformance/persistence/test_cell1_prefix_durability.py::test_acknowledged_appends_survive_sigkill[WAL]",
+      "class": "platform-host",
+      "evidence": "same cell requesting WAL; upstream skips via pytest.skip when the resolver downgrade gates trip",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/conformance/persistence/test_cell2_consume_once.py::test_exactly_one_claimant_wins",
+      "class": "platform-host",
+      "evidence": "8 concurrent OS processes released from a file barrier race claim_handoff; exactly-one-winner under real process concurrency",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/conformance/persistence/test_cell3_rotation_atomicity.py::test_rotation_is_atomic_under_sigkill[None]",
+      "class": "platform-host",
+      "evidence": "SIGKILL rotation atomicity cell; journal-mode resolution via child config",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/conformance/persistence/test_cell3_rotation_atomicity.py::test_rotation_is_atomic_under_sigkill[DELETE]",
+      "class": "platform-host",
+      "evidence": "same cell pinned to explicit DELETE",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/conformance/persistence/test_cell3_rotation_atomicity.py::test_rotation_is_atomic_under_sigkill[WAL]",
+      "class": "platform-host",
+      "evidence": "same cell requesting WAL; conditional skip as in cell1",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/conformance/persistence/test_cell5_delivery_outbox_exactly_once.py::test_crash_between_send_and_record_never_double_delivers[recorded-unsent]",
+      "class": "platform-host",
+      "evidence": "outbox exactly-once cell: parent+child processes, SIGKILL at kill_point=recorded-unsent, real gateway platform adapter; crash-window contract",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/conformance/persistence/test_cell5_delivery_outbox_exactly_once.py::test_crash_between_send_and_record_never_double_delivers[attempting-unsent]",
+      "class": "platform-host",
+      "evidence": "same cell, kill_point=attempting-unsent",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/conformance/persistence/test_cell5_delivery_outbox_exactly_once.py::test_crash_between_send_and_record_never_double_delivers[sent-unacked]",
+      "class": "platform-host",
+      "evidence": "same cell, kill_point=sent-unacked",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/conformance/persistence/test_cell5_delivery_outbox_exactly_once.py::test_crash_between_send_and_record_never_double_delivers[resend-crash-attempting]",
+      "class": "platform-host",
+      "evidence": "same cell, kill_point=resend-crash-attempting (child crashes during resend)",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/conformance/persistence/test_cell5_delivery_outbox_exactly_once.py::test_boot_killed_inside_plain_redelivery_never_double_delivers",
+      "class": "platform-host",
+      "evidence": "boot-time redelivery killed mid-flight; exactly-once across restart",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/conformance/persistence/test_cell5_delivery_outbox_exactly_once.py::test_concurrent_reboots_claim_each_obligation_once",
+      "class": "platform-host",
+      "evidence": "concurrent reboot processes claim each outbox obligation exactly once",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/conformance/test_profile_write_tripwire.py::test_no_default_profile_writes[session_db]",
+      "class": "observable",
+      "evidence": "ProfileTripwire snapshots default-profile tree; session-store writes under active profile must not touch it; filesystem-tree diff verdict",
+      "adapter_note": "Verdict is a filesystem diff - adapter-observable; exercises SessionDB/config/memory/cron persistence surfaces.",
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/conformance/test_profile_write_tripwire.py::test_no_default_profile_writes[config_save]",
+      "class": "observable",
+      "evidence": "same tripwire; settings/config save surface",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/conformance/test_profile_write_tripwire.py::test_no_default_profile_writes[memory_store]",
+      "class": "observable",
+      "evidence": "same tripwire; memory store surface",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/conformance/test_profile_write_tripwire.py::test_no_default_profile_writes[cron_store]",
+      "class": "observable",
+      "evidence": "same tripwire; cron jobs.json save/load surface",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/conformance/test_vector_generator.py::test_corpus_ids_unique_and_categorized",
+      "class": "observable",
+      "evidence": "vector corpus ids unique + categories grid/scar/adversarial with minimum counts; pure corpus invariants",
+      "adapter_note": "Corpus invariants transfer to the Rust conformance vector set.",
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/conformance/test_vector_generator.py::test_oracles_importable_and_self_free",
+      "class": "python-internal",
+      "evidence": "imports Python format_message renderers UNBOUND and renders through them; verifies Python oracle health",
+      "adapter_note": "The oracle itself is Python code; a Rust adapter re-implements oracles separately (see contract section 5).",
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/conformance/test_vector_generator.py::test_vector_files_shape",
+      "class": "observable",
+      "evidence": "generate(tmp_path) produces per-platform JSON docs with oracle provenance + expect taxonomy; file-shape assertion",
+      "adapter_note": null,
+      "upstream_run": "scoped"
+    },
+    {
+      "id": "tests/conformance/test_vector_generator.py::test_committed_vectors_match_regeneration",
+      "class": "observable",
+      "evidence": "committed tests/conformance/vectors/ regenerate byte-equal (modulo commit stamp); lockstep drift check",
+      "adapter_note": "The Rust-side analogue regenerates the same vectors from its own oracles.",
+      "upstream_run": "scoped"
+    }
+  ]
+}

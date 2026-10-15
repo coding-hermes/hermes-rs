@@ -1,0 +1,389 @@
+{
+  "schema": "hermes-rs/paired-run/1",
+  "denominator": {
+    "total": 12,
+    "expected_total": 12,
+    "reconciles": true
+  },
+  "counts": {
+    "passed": 7,
+    "failed": 5,
+    "skip_excluded": 0,
+    "other": 0
+  },
+  "harness_sha": "e06df9c2eae6901f4c88f464e0ae6e753c0428b8",
+  "harness": {
+    "upstream_repo": "NousResearch/hermes-agent",
+    "upstream_tag": "v0.22.0",
+    "runner": "scripts/run_tests.sh (per-file isolation) per specs/UPSTREAM_BASELINE.md"
+  },
+  "adapter": {
+    "adapter_sha": "8e4518781b9f551174e514d2b40b2557921e47f8047935cb697e619c40a7eb7b",
+    "target_module_sha": "35964b27e81f02f36d0b8cff4d2554fef53898a43592ad98b8b3536697bea9ad",
+    "corpus_sha": "9ecc3c04c6ee62685fbb4e34d749e907d480e13a6a135e5b98406864b3719c90",
+    "target_language": "python-stub (stands in for hermes-rs)"
+  },
+  "host": {
+    "repo_head": "32fb0719dc5b95c61f31f5383e49973b8fb4cfbb",
+    "python": "3.11.15",
+    "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.43"
+  },
+  "results": [
+    {
+      "vector": "nv-mt-override",
+      "status": "PASS",
+      "target": "rust_target",
+      "verdict": {
+        "vector": "nv-mt-override",
+        "checks": {
+          "url": {
+            "expected": "https://integrate.api.nvidia.com/v1/chat/completions",
+            "actual": "https://integrate.api.nvidia.com/v1/chat/completions",
+            "match": true
+          },
+          "wire_model": {
+            "expected": "nvidia/llama-3.1-nemotron-70b-instruct",
+            "actual": "nvidia/llama-3.1-nemotron-70b-instruct",
+            "match": true
+          },
+          "max_completion_tokens": {
+            "expected": 4096,
+            "actual": 4096,
+            "match": true
+          }
+        },
+        "match": true
+      }
+    },
+    {
+      "vector": "kimi-reasoning-xor",
+      "status": "PASS",
+      "target": "rust_target",
+      "verdict": {
+        "vector": "kimi-reasoning-xor",
+        "checks": {
+          "url": {
+            "expected": "https://api.moonshot.ai/v1/chat/completions",
+            "actual": "https://api.moonshot.ai/v1/chat/completions",
+            "match": true
+          },
+          "wire_model": {
+            "expected": "kimi-k2",
+            "actual": "kimi-k2",
+            "match": true
+          },
+          "reasoning_effort": {
+            "expected": "high",
+            "actual": "high",
+            "match": true
+          },
+          "extra_body_thinking": {
+            "expected": null,
+            "actual": null,
+            "match": true
+          }
+        },
+        "match": true
+      }
+    },
+    {
+      "vector": "or-provider-prefs",
+      "status": "FAIL",
+      "target": "rust_target",
+      "verdict": {
+        "vector": "or-provider-prefs",
+        "checks": {
+          "url": {
+            "expected": "https://openrouter.ai/api/v1/chat/completions",
+            "actual": "https://openrouter.ai/api/v1/chat/completions",
+            "match": true
+          },
+          "wire_model": {
+            "expected": "anthropic/claude-sonnet-4.6",
+            "actual": "anthropic/claude-sonnet-4.6",
+            "match": true
+          },
+          "extra_body_provider": {
+            "expected": {
+              "allow": [
+                "anthropic"
+              ],
+              "sort": "price"
+            },
+            "actual": null,
+            "match": false
+          }
+        },
+        "match": false
+      }
+    },
+    {
+      "vector": "meta-vision-flags",
+      "status": "PASS",
+      "target": "rust_target",
+      "verdict": {
+        "vector": "meta-vision-flags",
+        "checks": {
+          "url": {
+            "expected": "https://api.meta.ai/v1/chat/completions",
+            "actual": "https://api.meta.ai/v1/chat/completions",
+            "match": true
+          },
+          "wire_model": {
+            "expected": "muse-spark-latest",
+            "actual": "muse-spark-latest",
+            "match": true
+          },
+          "supports_vision": {
+            "expected": true,
+            "actual": true,
+            "match": true
+          },
+          "supports_vision_tool_messages": {
+            "expected": false,
+            "actual": false,
+            "match": true
+          }
+        },
+        "match": true
+      }
+    },
+    {
+      "vector": "qwen-vl-hi-res",
+      "status": "FAIL",
+      "target": "rust_target",
+      "verdict": {
+        "vector": "qwen-vl-hi-res",
+        "checks": {
+          "url": {
+            "expected": "https://portal.qwen.ai/v1/chat/completions",
+            "actual": "https://portal.qwen.ai/v1/chat/completions",
+            "match": true
+          },
+          "wire_model": {
+            "expected": "qwen3.5-plus",
+            "actual": "qwen3.5-plus",
+            "match": true
+          },
+          "extra_body_vl_high_resolution_images": {
+            "expected": true,
+            "actual": null,
+            "match": false
+          }
+        },
+        "match": false
+      }
+    },
+    {
+      "vector": "qwen-metadata-toplevel",
+      "status": "PASS",
+      "target": "rust_target",
+      "verdict": {
+        "vector": "qwen-metadata-toplevel",
+        "checks": {
+          "url": {
+            "expected": "https://portal.qwen.ai/v1/chat/completions",
+            "actual": "https://portal.qwen.ai/v1/chat/completions",
+            "match": true
+          },
+          "wire_model": {
+            "expected": "qwen3.5-plus",
+            "actual": "qwen3.5-plus",
+            "match": true
+          },
+          "metadata": {
+            "expected": {
+              "sessionId": "s123",
+              "promptId": "p456"
+            },
+            "actual": {
+              "sessionId": "s123",
+              "promptId": "p456"
+            },
+            "match": true
+          },
+          "extra_body_metadata": {
+            "expected": null,
+            "actual": null,
+            "match": true
+          }
+        },
+        "match": true
+      }
+    },
+    {
+      "vector": "ollama-numctx",
+      "status": "FAIL",
+      "target": "rust_target",
+      "verdict": {
+        "vector": "ollama-numctx",
+        "checks": {
+          "url": {
+            "expected": "http://127.0.0.1:11434/v1/chat/completions",
+            "actual": "http://127.0.0.1:11434/v1/chat/completions",
+            "match": true
+          },
+          "wire_model": {
+            "expected": "llama3.1",
+            "actual": "llama3.1",
+            "match": true
+          },
+          "extra_body_options_num_ctx": {
+            "expected": 131072,
+            "actual": null,
+            "match": false
+          }
+        },
+        "match": false
+      }
+    },
+    {
+      "vector": "custom-think-false",
+      "status": "FAIL",
+      "target": "rust_target",
+      "verdict": {
+        "vector": "custom-think-false",
+        "checks": {
+          "url": {
+            "expected": "http://127.0.0.1:11434/v1/chat/completions",
+            "actual": "http://127.0.0.1:11434/v1/chat/completions",
+            "match": true
+          },
+          "wire_model": {
+            "expected": "qwen3:72b",
+            "actual": "qwen3:72b",
+            "match": true
+          },
+          "extra_body_think": {
+            "expected": false,
+            "actual": null,
+            "match": false
+          }
+        },
+        "match": false
+      }
+    },
+    {
+      "vector": "custom-mistral-think-omit",
+      "status": "PASS",
+      "target": "rust_target",
+      "verdict": {
+        "vector": "custom-mistral-think-omit",
+        "checks": {
+          "url": {
+            "expected": "https://api.mistral.ai/v1/chat/completions",
+            "actual": "https://api.mistral.ai/v1/chat/completions",
+            "match": true
+          },
+          "wire_model": {
+            "expected": "mistral-small-latest",
+            "actual": "mistral-small-latest",
+            "match": true
+          },
+          "extra_body_think": {
+            "expected": null,
+            "actual": null,
+            "match": true
+          },
+          "reasoning_effort": {
+            "expected": "none",
+            "actual": "none",
+            "match": true
+          }
+        },
+        "match": true
+      }
+    },
+    {
+      "vector": "ds-no-forced-max-tokens",
+      "status": "FAIL",
+      "target": "rust_target",
+      "verdict": {
+        "vector": "ds-no-forced-max-tokens",
+        "checks": {
+          "url": {
+            "expected": "https://api.deepseek.com/v1/chat/completions",
+            "actual": "https://api.deepseek.com/v1/chat/completions",
+            "match": true
+          },
+          "wire_model": {
+            "expected": "deepseek-chat",
+            "actual": "deepseek-chat",
+            "match": true
+          },
+          "max_tokens": {
+            "expected": null,
+            "actual": 4096,
+            "match": false
+          },
+          "max_completion_tokens": {
+            "expected": null,
+            "actual": null,
+            "match": true
+          }
+        },
+        "match": false
+      }
+    },
+    {
+      "vector": "nvidia-toolmsg-drop-name",
+      "status": "PASS",
+      "target": "rust_target",
+      "verdict": {
+        "vector": "nvidia-toolmsg-drop-name",
+        "checks": {
+          "url": {
+            "expected": "https://integrate.api.nvidia.com/v1/chat/completions",
+            "actual": "https://integrate.api.nvidia.com/v1/chat/completions",
+            "match": true
+          },
+          "wire_model": {
+            "expected": "mistralai/mistral-large-3-675b-instruct-2512",
+            "actual": "mistralai/mistral-large-3-675b-instruct-2512",
+            "match": true
+          },
+          "tool_message": {
+            "expected": {
+              "role": "tool",
+              "tool_call_id": "call_1",
+              "content": "ok"
+            },
+            "actual": {
+              "role": "tool",
+              "tool_call_id": "call_1",
+              "content": "ok"
+            },
+            "match": true
+          }
+        },
+        "match": true
+      }
+    },
+    {
+      "vector": "mc-reasoning-map",
+      "status": "PASS",
+      "target": "rust_target",
+      "verdict": {
+        "vector": "mc-reasoning-map",
+        "checks": {
+          "url": {
+            "expected": "https://api.meta.ai/v1/chat/completions",
+            "actual": "https://api.meta.ai/v1/chat/completions",
+            "match": true
+          },
+          "wire_model": {
+            "expected": "muse-spark-latest",
+            "actual": "muse-spark-latest",
+            "match": true
+          },
+          "reasoning_effort": {
+            "expected": "minimal",
+            "actual": "minimal",
+            "match": true
+          }
+        },
+        "match": true
+      }
+    }
+  ]
+}
