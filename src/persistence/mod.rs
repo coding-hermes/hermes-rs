@@ -9,9 +9,9 @@
 
 pub mod api;
 pub mod stock_sqlite;
-pub mod upstream_ddl;
 #[cfg(feature = "turso")]
 pub mod turso_backend;
+pub mod upstream_ddl;
 
 pub use api::{
     AppendMessage, BatchAppendReport, BusyKind, Capabilities, Capability, CapabilitySupport,
