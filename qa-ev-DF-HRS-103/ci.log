@@ -1,0 +1,21 @@
+time="2026-10-16T13:59:54Z" level=info msg="Using docker host 'unix:///run/bunker/c69fa222/docker.sock', and daemon socket 'unix:///run/bunker/c69fa222/docker.sock'"
+[CI/Project contracts and board integrity] ⭐ Run Set up job
+[CI/Project contracts and board integrity] 🚀  Start image=catthehacker/ubuntu:act-latest
+[CI/Project contracts and board integrity]   🐳  docker pull image=catthehacker/ubuntu:act-latest platform= username= forcePull=true
+[CI/Project contracts and board integrity]   🐳  docker create image=catthehacker/ubuntu:act-latest platform= entrypoint=["tail" "-f" "/dev/null"] cmd=[] network="host"
+[CI/Project contracts and board integrity]   🐳  docker run image=catthehacker/ubuntu:act-latest platform= entrypoint=["tail" "-f" "/dev/null"] cmd=[] network="host"
+[CI/Project contracts and board integrity]   🐳  docker exec cmd=[node --no-warnings -e console.log(process.execPath)] user= workdir=
+[CI/Project contracts and board integrity]   ✅  Success - Set up job
+[CI/Project contracts and board integrity] ⭐ Run Main actions/checkout@v4
+[CI/Project contracts and board integrity]   🐳  docker cp src=/home/bunker-c69fa222/qa-hermes-rs/. dst=/home/bunker-c69fa222/qa-hermes-rs
+[CI/Project contracts and board integrity]   ✅  Success - Main actions/checkout@v4 [235.148772ms]
+[CI/Project contracts and board integrity] ⭐ Run Main Validate kickoff contracts and board JSONL
+[CI/Project contracts and board integrity]   🐳  docker exec cmd=[bash -e /var/run/act/workflow/1] user= workdir=
+[CI/Project contracts and board integrity]   ✅  Success - Main Validate kickoff contracts and board JSONL [215.038595ms]
+[CI/Project contracts and board integrity] ⭐ Run Main Check committed whitespace
+[CI/Project contracts and board integrity]   🐳  docker exec cmd=[bash -e /var/run/act/workflow/2] user= workdir=
+[CI/Project contracts and board integrity]   ✅  Success - Main Check committed whitespace [191.848004ms]
+[CI/Project contracts and board integrity] ⭐ Run Complete job
+[CI/Project contracts and board integrity] Cleaning up container for job Project contracts and board integrity
+[CI/Project contracts and board integrity]   ✅  Success - Complete job
+[CI/Project contracts and board integrity] 🏁  Job succeeded

@@ -1,7 +1,7 @@
 # HRS-003 non-vacuity evidence (deliberately broken call)
-Date: 2026-10-16T02:26:07Z
+Date: 2026-10-16T14:09:43Z
 Python: 3.11.15  sqlite3 lib: 3.53.1
-Adapter binary: /var/tmp/hermes-scratch/hrs003-adapter-broken-3060278
+Adapter binary: /var/tmp/hermes-scratch/hrs003-adapter-broken-1618961
 Mutation: append_message against a session id that was never ensured.
 
 observed: AdapterError(error='SessionRowMissing', cause='session_row_missing', detail='no such session row')

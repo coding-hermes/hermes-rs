@@ -1,0 +1,24 @@
+{"project": "hermes-rs", "cell": "repo-head", "status": "OK", "detail": "tested HEAD=7a0e0b81969104a1722bc60628aa1d4e3ffb7b22 at launch=2026-10-16T13:59:02Z (pull=clone dirty \u2014 pull skipped, testing recorded sha)", "ts": "2026-10-16T13:58:36Z"}
+{"project": "hermes-rs", "cell": "launch", "status": "OK", "detail": "agent=c69fa222 server=bunker-mvp ttl=4h script_bytes=118515 \u2014 battery started detached (qa-run.sh); phase B: bunker-qa.sh collect --evidence /tmp/bunker-qa-hermes-rs-dfhrs103-20261016.jsonl", "ts": "2026-10-16T13:59:02Z"}
+{"project": "hermes-rs", "cell": "repo-head", "status": "OK", "detail": "tested HEAD=7a0e0b81969104a1722bc60628aa1d4e3ffb7b22 (pull: clone dirty \u2014 pull skipped, testing recorded sha)", "ts": "2026-10-16T13:59:02.684585+00:00"}
+{"project": "hermes-rs", "cell": "toolchain-bootstrap", "status": "OK", "detail": "go 1.26.5 installed (~/tools/go; floor=none distro=absent)", "ts": "2026-10-16T13:59:05.798268+00:00"}
+{"project": "hermes-rs", "cell": "toolchain-bootstrap", "status": "OK", "detail": "rust stable installed (~/tools/cargo + ~/tools/rustup)", "ts": "2026-10-16T13:59:18.037715+00:00"}
+{"project": "hermes-rs", "cell": "toolchain-bootstrap", "status": "OK", "detail": "system gcc/g++ toolchain (~/tools/bin wrappers -> gcc/g++) \u2014 preferred over zig-cc for C++ cgo deps (MCP-008)", "ts": "2026-10-16T13:59:24.661996+00:00"}
+{"project": "hermes-rs", "cell": "toolchain-bootstrap", "status": "OK", "detail": "make available (preinstalled) \u2014 GNU Make 4.3", "ts": "2026-10-16T13:59:24.713957+00:00"}
+{"project": "hermes-rs", "cell": "toolchain-bootstrap", "status": "INFO", "detail": "bare agent missing system deps: openssl(libssl-dev) \u2014 rust build cells graded ENV-BLOCKED when they fail on these (no sudo to apt install)", "ts": "2026-10-16T13:59:24.795164+00:00"}
+{"project": "hermes-rs", "cell": "fresh-install", "status": "OK", "detail": "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 21.88s", "ts": "2026-10-16T13:59:48.158063+00:00"}
+{"project": "hermes-rs", "cell": "toolchain-bootstrap", "status": "OK", "detail": "compose plugin installed (~/.docker/cli-plugins/docker-compose)", "ts": "2026-10-16T13:59:49.545375+00:00"}
+{"project": "hermes-rs", "cell": "toolchain-bootstrap", "status": "OK", "detail": "buildx plugin installed (github.com/docker/buildx v0.38.0 0dbe87f36ed472fe36b6796c3f70b4210a731fc5)", "ts": "2026-10-16T13:59:50.718471+00:00"}
+{"project": "hermes-rs", "cell": "toolchain-bootstrap", "status": "OK", "detail": "node+npm installed (v22.15.0)", "ts": "2026-10-16T13:59:53.941973+00:00"}
+{"project": "hermes-rs", "cell": "toolchain-bootstrap", "status": "OK", "detail": "HARNESS-COMPOSE=ok (docker compose version passes)", "ts": "2026-10-16T13:59:54.379494+00:00"}
+{"project": "hermes-rs", "cell": "toolchain-bootstrap", "status": "OK", "detail": "HARNESS_NODE=ok (node v22.15.0, npm 10.9.2)", "ts": "2026-10-16T13:59:54.635893+00:00"}
+{"project": "hermes-rs", "cell": "ci-pass", "status": "OK", "detail": "act: 1 jobs green \u2014 rc=0 (1 triggerable workflow(s))", "ts": "2026-10-16T14:00:17.543986+00:00"}
+{"project": "hermes-rs", "cell": "upgrade", "status": "N/A", "detail": "no release tags in repo", "ts": "2026-10-16T14:00:17.764323+00:00"}
+{"project": "hermes-rs", "cell": "docker-deploy", "status": "N/A", "detail": "no compose file", "ts": "2026-10-16T14:00:17.827796+00:00"}
+{"project": "hermes-rs", "cell": "ui-probe", "status": "N/A", "detail": "no web UI detected", "ts": "2026-10-16T14:00:17.859145+00:00"}
+{"project": "hermes-rs", "cell": "chaos-disconnect", "status": "UNVERIFIED", "detail": "disc.log is EMPTY (0 bytes) or never-ran (no-test-path marker) -- the suite produced NO output, so the network cut was NEVER exercised; rc=0 is not a disconnect result (QA-WARPFS-17; QA-BUNKER-29 vacuity class)", "ts": "2026-10-16T14:00:17.934364+00:00"}
+{"project": "hermes-rs", "cell": "chaos-shutdown", "status": "N/A", "detail": "no compose file", "ts": "2026-10-16T14:00:18.016573+00:00"}
+{"project": "hermes-rs", "cell": "chaos-corruption", "status": "N/A", "detail": "no db/state files in repo", "ts": "2026-10-16T14:00:18.060439+00:00"}
+{"project": "hermes-rs", "cell": "chaos-resource", "status": "FAIL", "detail": "rc=101 under cap (cap=3145728KB child_saw=3145728 subshell_saw=3145728 parent_saw=unlimited): test result: FAILED. 17 passed; 5 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.43s  error: test failed, to rerun pass `--test hrs010_session_store` ", "ts": "2026-10-16T14:00:25.693420+00:00"}
+{"project": "hermes-rs", "cell": "chaos-errorpath", "status": "INFO", "detail": "no start command detected / entrypoint not observable \u2014 missing-config behavior UNVERIFIED", "ts": "2026-10-16T14:00:25.727905+00:00"}
+{"cell":"collect","status":"OK","detail":"agent=c69fa222 (bunker-mvp) — pulled 21 evidence row(s), merge-deduped by ts; temp agent destroyed","ts":"2026-10-16T14:03:02Z"}

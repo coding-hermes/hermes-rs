@@ -1,0 +1,120 @@
+PARENT_CAP=unlimited
+SUBSHELL_CAP=3145728
+CAP_EFFECTIVE=3145728 CAP_REQUESTED=3145728
+   Compiling hermes-rs v0.1.0 (/home/bunker-c69fa222/qa-hermes-rs)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.92s
+     Running unittests src/lib.rs (target/debug/deps/hermes_rs-d54abd37045619b1)
+
+running 1 test
+test tests::reports_scaffold_status ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/main.rs (target/debug/deps/hermes_rs-a1c38ea90c77f964)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/session_adapter.rs (target/debug/deps/hermes_rs_session_adapter-61b11d30f7a61c50)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/cli.rs (target/debug/deps/cli-430eff5ed4114927)
+
+running 1 test
+test executable_prints_the_library_scaffold_status ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/hrs003_python_interop.rs (target/debug/deps/hrs003_python_interop-43042a050a31f7ea)
+
+running 5 tests
+test hrs003_protocol_hello_reports_boundary_and_schema ... ok
+test hrs003_protocol_malformed_json_fails_closed_nonzero ... ok
+test hrs003_protocol_unknown_method_fails_closed_nonzero ... ok
+test hrs003_broken_case_fails_and_evidence_is_written ... ok
+test hrs003_python_roundtrip_and_sqlite_readback ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.82s
+
+     Running tests/hrs009_backend_parity.rs (target/debug/deps/hrs009_backend_parity-51c544e5ee262603)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/hrs009_crash_child.rs (target/debug/deps/hrs009_crash_child-38943f976840f1d6)
+
+running 1 test
+test crash_child ... ignored, crash-child harness: driven by p7_kill9 via --exact with args
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/hrs010_session_store.rs (target/debug/deps/hrs010_session_store-2d3758e9c2ca954f)
+
+running 22 tests
+test capability_gate_returns_unsupported_not_silent_degradation ... ok
+test append_into_missing_session_is_session_row_missing ... ok
+test f1_fixture_opens_and_recognizes_schema_v31 ... ok
+test compression_closed_session_refuses_appends ... ok
+test f1_read_only_open_leaves_the_file_byte_identical ... ok
+test f2_fts_search_finds_unique_token_with_bm25_and_snippet ... ok
+test f2_reads_exact_fixture_rows_from_python_produced_db ... ok
+test f2_rust_write_then_sqlite3_reads_the_same_file ... FAILED
+test f3_slice_scale_acknowledged_writes_survive_close_and_reopen ... ok
+test f5_passive_checkpoint_policy_and_wal_hygiene ... ok
+test f8_backup_snapshot_restores_and_reopens ... ok
+test f9_generation_counter_increments_and_never_decrements ... FAILED
+test migration_newer_schema_version_is_refused_not_downgraded ... FAILED
+test recovery_garbage_header_is_quarantined ... ok
+test recovery_zeroed_file_is_quarantined_never_silently_rewritten ... ok
+test slice_append_message_assigns_durable_rowids_and_moves_counters_atomically ... ok
+test slice_end_session_on_fresh_keyed_session_bumps_generation_once ... ok
+test slice_end_session_first_reason_wins_and_generation_semantics ... ok
+test slice_ensure_session_upsert_never_overwrites_and_replaces_unknown_source ... ok
+test stale_fts_marker_serves_canonical_rows_not_partial_search ... FAILED
+test slice_record_model_usage_upserts_and_falls_back_to_session_route ... FAILED
+test transaction_rollback_discards_all_or_nothing ... ok
+
+failures:
+
+---- f2_rust_write_then_sqlite3_reads_the_same_file stdout ----
+
+thread 'f2_rust_write_then_sqlite3_reads_the_same_file' (3047545) panicked at tests/hrs010_session_store.rs:259:10:
+run system sqlite3: Os { code: 2, kind: NotFound, message: "No such file or directory" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- f9_generation_counter_increments_and_never_decrements stdout ----
+
+thread 'f9_generation_counter_increments_and_never_decrements' (3047570) panicked at tests/hrs010_session_store.rs:579:10:
+sqlite3 read: Os { code: 2, kind: NotFound, message: "No such file or directory" }
+
+---- migration_newer_schema_version_is_refused_not_downgraded stdout ----
+
+thread 'migration_newer_schema_version_is_refused_not_downgraded' (3047571) panicked at tests/hrs010_session_store.rs:681:10:
+bump version: Os { code: 2, kind: NotFound, message: "No such file or directory" }
+
+---- stale_fts_marker_serves_canonical_rows_not_partial_search stdout ----
+
+thread 'stale_fts_marker_serves_canonical_rows_not_partial_search' (3047581) panicked at tests/hrs010_session_store.rs:982:10:
+stamp fts_stale: Os { code: 2, kind: NotFound, message: "No such file or directory" }
+
+---- slice_record_model_usage_upserts_and_falls_back_to_session_route stdout ----
+
+thread 'slice_record_model_usage_upserts_and_falls_back_to_session_route' (3047580) panicked at tests/hrs010_session_store.rs:653:10:
+sqlite3 read: Os { code: 2, kind: NotFound, message: "No such file or directory" }
+
+
+failures:
+    f2_rust_write_then_sqlite3_reads_the_same_file
+    f9_generation_counter_increments_and_never_decrements
+    migration_newer_schema_version_is_refused_not_downgraded
+    slice_record_model_usage_upserts_and_falls_back_to_session_route
+    stale_fts_marker_serves_canonical_rows_not_partial_search
+
+test result: FAILED. 17 passed; 5 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.43s
+
+error: test failed, to rerun pass `--test hrs010_session_store`
