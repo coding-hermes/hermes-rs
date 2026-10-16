@@ -1,0 +1,16 @@
+{"task":"HRS-009","backend":"turso","seed":40542292250984457,
+  "dataset": {"sessions": 5000,"seed_wall_seconds": 16.489125401s,"storage_bytes": 323117056,
+              "generator": "xorshift64* seed 40542292250984457; 2-10 messages/session; 200-500 words/message"},
+  "workload": {"ops": 10000,"reads": 49,"writes": 0,"read_write_mix":"70/30 fixed by seed",
+                "pattern": "point reads by session id + message page reads; ensure+append writes; usage delta every 25th write; passive checkpoint every 500 writes"},
+  "results": {
+    "wall_seconds": 1.745277975,
+    "throughput_ops_per_s": 28.1,
+    "read_latency": {"p50_ms": 35.307,"p95_ms": 38.124,"p99_ms": 39.806,"mean_ms": 35.556,"max_ms": 39.806,"n": 49},
+    "write_latency": {"p50_ms": 0.019,"p95_ms": 0.334,"p99_ms": 0.706,"mean_ms": 0.135,"max_ms": 0.706,"n": 0},
+    "peak_rss_kb": 38412,
+    "errors": 22
+  },
+  "environment": {"cpu_model":"AMD Ryzen 9 7950X 16-Core Processor","cores":32,"kernel":"6.12.96+deb13-amd64","rustc":"unknown (see bench README env block)"},
+  "caveats": "single process per engine; benchmark host and load at run time are recorded in benchmarks/README.md; no tuning pass was made after first results"
+}
