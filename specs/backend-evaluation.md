@@ -39,9 +39,14 @@ that would require new evidence.
 
 Harness: `examples/hrs009_bench.rs`, driven by `scripts/run_hrs009_bench.sh`
 on **master001** (AMD Ryzen 9 7950X, 32 hardware threads, Debian 13,
-kernel 6.12, NVMe, load 0.18 at run time). The kara agent box was EXCLUDED:
+kernel 6.12, NVMe, load 0.39 at run time). The kara agent box was EXCLUDED:
 it sat at load ~52 during this task (documented host I/O starvation) and
-any number from it would be noise, not measurement.
+any number from it would be noise, not measurement. The CPU metric
+(`cpu_seconds_total`, `cpu_percent_avg`, `cpu_method` in each JSON —
+/proc/self/stat utime+stime delta across the workload, hrs006 baseline
+convention) was added in the HRS-009 rework and BOTH arms were re-run
+back-to-back on the SAME fixed dataset; every number below is from that
+CPU-instrumented re-run.
 
 Dataset (both arms open the SAME file, fixed seed, no post-hoc tuning):
 - 5,000 sessions, 2–10 transcript messages each (200–500 words/message ≈
@@ -62,13 +67,20 @@ RESULTS:
 | Metric | Stock SQLite (rusqlite 0.40.2) | Turso 0.8.3 |
 |---|---|---|
 | Ops completed / attempted | 10,000 / 10,000 (0 errors) | 49 / 10,000 — **0 writes landed; harness error circuit-breaker stopped the run** |
-| Wall clock | 1.00 s | 1.75 s (for the 49 ops it managed) |
-| Throughput | 9,978.5 ops/s | 28.1 ops/s (non-comparable: run aborted) |
-| Read p50 / p95 / p99 | 0.042 / 0.057 / 0.064 ms | 35.3 / 38.1 / 39.8 ms |
-| Write p50 / p95 / p99 | 0.175 / 0.296 / 0.819 ms | no writes committed (error path) |
-| Peak RSS (VmHWM) | 7.6 MB | 38.4 MB |
+| Wall clock | 0.98 s | 1.70 s (for the 49 ops it managed) |
+| Throughput | 10,205.6 ops/s | 28.8 ops/s (non-comparable: run aborted) |
+| CPU total (`cpu_seconds_total`) | 0.980 s | 1.700 s (for the 49 ops it managed) |
+| CPU avg (`cpu_percent_avg`) | 100.0% of one core | 100.0% of one core |
+| Read p50 / p95 / p99 | 0.041 / 0.056 / 0.062 ms | 34.2 / 36.3 / 38.6 ms |
+| Write p50 / p95 / p99 | 0.172 / 0.280 / 0.824 ms | no writes committed (error path) |
+| Peak RSS (VmHWM) | 7.7 MB | 40.3 MB |
 
-The turso arm's 35–40 ms reads and the aborted writes have one measured
+CPU reading: both engines peg ~one core for the duration (100%), but
+turso holds that core 1.7× longer to deliver 0.5% of the completed work
+— i.e. its CPU cost per completed op is ~350× stock's (34.7 ms/op vs
+0.098 ms/op), consistent with its per-read full-scan behavior (§3.2).
+
+The turso arm's 34–39 ms reads and the aborted writes have one measured
 root cause (§3.2): the dataset is a real Hermes-shaped store WITH FTS5
 objects, and turso 0.8.3 mis-handles schema resolution on such files —
 every `ensure_session` upsert fails with `Parse error: ON CONFLICT clause
@@ -82,10 +94,11 @@ turso-on-turso numbers would describe an engine that cannot host upstream
 data anyway.
 
 **Honest losing number: Turso is the loser on p95 — on the identical
-Hermes-shaped workload its read p95 is ~670× stock SQLite's (38.1 ms vs
-0.057 ms) and it committed ZERO writes before aborting on its own
-schema-resolution failure (exact values in
-`benchmarks/results/hrs009-turso.json` vs `hrs009-stock.json`).**
+Hermes-shaped workload its read p95 is ~649× stock SQLite's (36.3 ms vs
+0.056 ms) and it committed ZERO writes before aborting on its own
+schema-resolution failure, burning 1.7× stock's CPU time to do it
+(exact values in `benchmarks/results/hrs009-turso.json` vs
+`hrs009-stock.json`).**
 
 ## 3. Compatibility battery results (per test, per backend)
 

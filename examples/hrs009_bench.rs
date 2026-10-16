@@ -142,6 +142,27 @@ fn storage_bytes(path: &std::path::Path) -> u64 {
     total
 }
 
+/// Process CPU seconds consumed by THIS process (utime+stime from
+/// /proc/self/stat, CLK_TCK = 100 jiffies/s). Same source the hrs006
+/// baseline sampler records as cpu_seconds_total (single process here,
+/// so self-stat is the whole picture — no descendant tree to walk).
+fn process_cpu_seconds() -> f64 {
+    let raw = match std::fs::read_to_string("/proc/self/stat") {
+        Ok(s) => s,
+        Err(_) => return 0.0,
+    };
+    // comm may contain spaces/parens; numbered fields resume after the LAST ')'.
+    let rest = match raw.rsplit_once(')') {
+        Some((_, r)) => r,
+        None => return 0.0,
+    };
+    let f: Vec<&str> = rest.split_whitespace().collect();
+    // rest[0] is field 3 (state): utime = field 14 -> index 11, stime = 15 -> 12.
+    let utime: f64 = f.get(11).and_then(|v| v.parse().ok()).unwrap_or(0.0);
+    let stime: f64 = f.get(12).and_then(|v| v.parse().ok()).unwrap_or(0.0);
+    (utime + stime) / 100.0
+}
+
 use std::path::PathBuf;
 
 struct WorkloadResult {
@@ -152,6 +173,7 @@ struct WorkloadResult {
     writes: u64,
     errors: Vec<String>,
     peak_rss_kb: u64,
+    cpu_seconds: f64,
 }
 
 fn run_workload(path: &std::path::Path, backend: &str, ops: u64) -> WorkloadResult {
@@ -196,6 +218,7 @@ fn run_workload_on<S: SessionStore>(
     let mut write_lat = Vec::new();
     let mut reads = 0u64;
     let mut writes = 0u64;
+    let cpu_before = process_cpu_seconds();
     let t0 = Instant::now();
     for op in 0..ops {
         let sid = session_id(rng.below(5000));
@@ -257,6 +280,7 @@ fn run_workload_on<S: SessionStore>(
         }
     }
     let wall = t0.elapsed();
+    let cpu_seconds = process_cpu_seconds() - cpu_before;
     let peak_rss_kb = vm_hwm_kb();
     drop(store);
     WorkloadResult {
@@ -267,6 +291,7 @@ fn run_workload_on<S: SessionStore>(
         writes,
         errors: std::mem::take(errors),
         peak_rss_kb,
+        cpu_seconds,
     }
 }
 
@@ -360,10 +385,16 @@ fn main() {
     let write_p = percentiles(result.write_lat.clone());
     let total_ops = (result.reads + result.writes) as f64;
     let throughput = total_ops / result.wall.as_secs_f64();
+    let wall_s = result.wall.as_secs_f64();
+    let cpu_pct = if wall_s > 0.0 {
+        result.cpu_seconds / wall_s * 100.0
+    } else {
+        0.0
+    };
 
     let record = format!(
         r#"{{"task":"HRS-009","backend":"{backend}","seed":{SEED},
-  "dataset": {{"sessions": {sessions},"seed_wall_seconds": {:?},"storage_bytes": {dataset_bytes},
+  "dataset": {{"sessions": {sessions},"seed_wall_seconds": {},"storage_bytes": {dataset_bytes},
               "generator": "xorshift64* seed {SEED}; 2-10 messages/session; 200-500 words/message"}},
   "workload": {{"ops": {ops},"reads": {reads},"writes": {writes},"read_write_mix":"70/30 fixed by seed",
                 "pattern": "point reads by session id + message page reads; ensure+append writes; usage delta every 25th write; passive checkpoint every 500 writes"}},
@@ -372,14 +403,17 @@ fn main() {
     "throughput_ops_per_s": {throughput:.1},
     "read_latency": {{"p50_ms": {:.3},"p95_ms": {:.3},"p99_ms": {:.3},"mean_ms": {:.3},"max_ms": {:.3},"n": {reads}}},
     "write_latency": {{"p50_ms": {:.3},"p95_ms": {:.3},"p99_ms": {:.3},"mean_ms": {:.3},"max_ms": {:.3},"n": {writes}}},
+    "cpu_seconds_total": {cpu:.3},
+    "cpu_method": "/proc/self/stat utime+stime delta read before/after the workload (CLK_TCK=100 jiffies/s; single process, no descendants — same convention as the hrs006 baseline cpu_seconds_total)",
+    "cpu_percent_avg": {cpupct:.1},
     "peak_rss_kb": {rss},
     "errors": {nerr}
   }},
   "environment": {env},
   "caveats": "single process per engine; benchmark host and load at run time are recorded in benchmarks/README.md; no tuning pass was made after first results"
 }}"#,
-        seed_elapsed,
-        result.wall.as_secs_f64(),
+        seed_elapsed.as_secs_f64(),
+        wall_s,
         read_p.p50 * 1000.0,
         read_p.p95 * 1000.0,
         read_p.p99 * 1000.0,
@@ -392,6 +426,8 @@ fn main() {
         write_p.max * 1000.0,
         reads = result.reads,
         writes = result.writes,
+        cpu = result.cpu_seconds,
+        cpupct = cpu_pct,
         rss = result.peak_rss_kb,
         nerr = result.errors.len(),
         env = env_json(),
@@ -399,10 +435,11 @@ fn main() {
 
     std::fs::write(&out, record).expect("write result json");
     println!(
-        "{backend}: wall {:?}, {throughput:.1} ops/s, read p95 {:.2}ms, write p95 {:.2}ms, rss {}KB, errors {}",
+        "{backend}: wall {:?}, {throughput:.1} ops/s, read p95 {:.2}ms, write p95 {:.2}ms, cpu {:.3}s ({cpu_pct:.1}%), rss {}KB, errors {}",
         result.wall,
         read_p.p95 * 1000.0,
         write_p.p95 * 1000.0,
+        result.cpu_seconds,
         result.peak_rss_kb,
         result.errors.len()
     );
