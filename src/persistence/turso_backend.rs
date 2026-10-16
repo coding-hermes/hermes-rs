@@ -81,10 +81,9 @@ fn classify(err: &turso::Error) -> PersistenceError {
             scope: CorruptScope::Store,
         },
         turso::Error::DatabaseFull(_) => PersistenceError::DiskFull,
-        turso::Error::IoError(kind, msg) => PersistenceError::Io(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            format!("turso io ({kind:?}): {msg}"),
-        )),
+        turso::Error::IoError(kind, msg) => {
+            PersistenceError::Io(std::io::Error::other(format!("turso io ({kind:?}): {msg}")))
+        }
         other => PersistenceError::Io(std::io::Error::other(format!("turso error: {other}"))),
     }
 }
@@ -212,6 +211,8 @@ fn split_statements(sql: &str) -> Vec<String> {
     }
     stmts
 }
+
+type EndedRow = Result<Option<(Option<f64>, Option<String>)>, turso::Error>;
 
 pub struct TursoBackend;
 
@@ -540,29 +541,28 @@ impl<'a> WriteTxn for TursoWriteTxn<'a> {
 
     fn append_message(&mut self, session_id: &str, msg: &AppendMessage) -> Result<i64, StoreError> {
         let engine = self.engine;
-        let ended: Result<Option<(Option<f64>, Option<String>)>, turso::Error> =
-            engine.rt.block_on(async {
-                let mut rows = engine
-                    .conn
-                    .query(
-                        "SELECT ended_at, end_reason FROM sessions WHERE id = ?1",
-                        turso::params![session_id],
-                    )
-                    .await?;
-                match rows.next().await? {
-                    Some(row) => {
-                        let ended_at = match row.get_value(0)? {
-                            TValue::Null => None,
-                            TValue::Real(r) => Some(r),
-                            TValue::Integer(i) => Some(i as f64),
-                            _ => None,
-                        };
-                        let end_reason = tv_to_option_string(&row.get_value(1)?);
-                        Ok(Some((ended_at, end_reason)))
-                    }
-                    None => Ok(None),
+        let ended: EndedRow = engine.rt.block_on(async {
+            let mut rows = engine
+                .conn
+                .query(
+                    "SELECT ended_at, end_reason FROM sessions WHERE id = ?1",
+                    turso::params![session_id],
+                )
+                .await?;
+            match rows.next().await? {
+                Some(row) => {
+                    let ended_at = match row.get_value(0)? {
+                        TValue::Null => None,
+                        TValue::Real(r) => Some(r),
+                        TValue::Integer(i) => Some(i as f64),
+                        _ => None,
+                    };
+                    let end_reason = tv_to_option_string(&row.get_value(1)?);
+                    Ok(Some((ended_at, end_reason)))
                 }
-            });
+                None => Ok(None),
+            }
+        });
         let ended = match ended {
             Ok(v) => v,
             Err(e) => return Err(StoreError::InvalidInput(e.to_string())),
@@ -783,29 +783,19 @@ impl<'a> WriteTxn for TursoWriteTxn<'a> {
                     .await?;
                 // Per-model attribution upsert (main-loop rows only, matching
                 // the slice: aux/task rows keep 'unknown' attribution).
-                let (model, provider, base_url, mode) = if delta.task.is_empty() {
-                    (
-                        if delta.model.is_empty() {
-                            "unknown".into()
-                        } else {
-                            delta.model.clone()
-                        },
-                        delta.billing_provider.clone(),
-                        delta.billing_base_url.clone(),
-                        delta.billing_mode.clone(),
-                    )
-                } else {
-                    (
-                        if delta.model.is_empty() {
-                            "unknown".into()
-                        } else {
-                            delta.model.clone()
-                        },
-                        delta.billing_provider.clone(),
-                        delta.billing_base_url.clone(),
-                        delta.billing_mode.clone(),
-                    )
-                };
+                // task is bound separately in the upsert; attribution itself
+                // is task-independent (clippy if_same_then_else: branches were
+                // byte-identical).
+                let (model, provider, base_url, mode) = (
+                    if delta.model.is_empty() {
+                        "unknown".into()
+                    } else {
+                        delta.model.clone()
+                    },
+                    delta.billing_provider.clone(),
+                    delta.billing_base_url.clone(),
+                    delta.billing_mode.clone(),
+                );
                 let now = now_epoch();
                 engine
                     .conn

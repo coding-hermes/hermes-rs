@@ -186,7 +186,7 @@ fn run_workload(path: &std::path::Path, backend: &str, ops: u64) -> WorkloadResu
             {
                 let (s, _o) =
                     TursoBackend::open(OpenOptions::read_write(path)).expect("turso open");
-                return run_workload_on(backend, s, path, ops, &mut errors);
+                run_workload_on(backend, s, path, ops, &mut errors)
             }
             #[cfg(not(feature = "turso"))]
             {
@@ -270,7 +270,7 @@ fn run_workload_on<S: SessionStore>(
             write_lat.push(start.elapsed().as_secs_f64());
             // WAL/checkpoint pressure every 500 writes (SQLite path; turso
             // no-ops its own checkpoint implementation).
-            if writes % 500 == 0 {
+            if writes.is_multiple_of(500) {
                 let _ = store.checkpoint_passive();
             }
         }

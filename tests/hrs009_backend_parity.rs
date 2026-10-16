@@ -488,7 +488,7 @@ fn p8_concurrent_access_two_writers_two_readers() {
                 (ops, errors)
             }));
         }
-        for reader in 0..2u64 {
+        for _reader in 0..2u64 {
             let store = store.clone();
             let stop = stop.clone();
             reader_handles.push(std::thread::spawn(move || -> u64 {
