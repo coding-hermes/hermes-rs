@@ -1055,13 +1055,10 @@ fn sanitize_fts5_query(query: &str) -> String {
     // deleting it.  Deletion merged adjacent words into non-existent tokens
     // (e.g. 'src/main.rs' → 'srcmain.rs').  A space preserves token
     // boundaries so FTS5 can match both 'src' and 'main.rs'.
-    let mut sanitized: String = sanitized.chars().map(|c| {
-        if SPECIAL.contains(&c) {
-            ' '
-        } else {
-            c
-        }
-    }).collect();
+    let mut sanitized: String = sanitized
+        .chars()
+        .map(|c| if SPECIAL.contains(&c) { ' ' } else { c })
+        .collect();
     if !sanitized.chars().any(|c| {
         let cp = c as u32;
         (0x4E00..=0x9FFF).contains(&cp) || (0x3400..=0x4DBF).contains(&cp)
@@ -1382,25 +1379,62 @@ impl<'a> SqliteReadTxn<'a> {
         limit: usize,
         offset: usize,
     ) -> Result<Vec<SearchHit>, StoreError> {
+        // DF-HRS-105: the LIKE arm is a fallback for the SAME question the FTS
+        // arm answers, so it must serve the SAME row set and mean the SAME
+        // thing by "present".
+        //
+        // (a) Row visibility is identical to the FTS arm's predicate. Serving
+        //     hidden scaffolding (`display_kind='hidden'`) or rewound rows
+        //     (`active=0, compacted=0`) through a fallback would hand back rows
+        //     the index route deliberately withholds — and it would do it
+        //     precisely on the queries MATCH could not answer. Upstream applies
+        //     `_search_filter_clauses` on every route, LIKE included; the stale
+        //     arm in this file and the Turso backend both filter the same way.
+        // (b) `%`, `_` and `\` in the user's term are escaped: LIKE has no way
+        //     to say "this character is literal" without ESCAPE, and an
+        //     unescaped `_`/`%` is a WILDCARD — so a search for `ok_x` would
+        //     report a row holding `aok_x` as a hit for text the store does not
+        //     contain. That is the same silent wrong answer this task is about,
+        //     pointing the other way.
+        let escaped = escape_like(term);
         let sql = "SELECT m.id, m.session_id, m.role FROM messages m
-                   WHERE m.content LIKE '%' || ?1 || '%' ORDER BY m.id LIMIT ?2 OFFSET ?3";
+                   WHERE m.content LIKE '%' || ?1 || '%' ESCAPE '\\'
+                     AND (m.active = 1 OR m.compacted = 1)
+                     AND COALESCE(m.display_kind, '') <> 'hidden'
+                   ORDER BY m.id LIMIT ?2 OFFSET ?3";
         let mut stmt = self
             .conn
             .prepare(sql)
             .map_err(|_| StoreError::InvalidInput("search fallback failed".into()))?;
         let rows = stmt
-            .query_map(rusqlite::params![term, limit as i64, offset as i64], |r| {
-                Ok(SearchHit {
-                    message_id: r.get(0)?,
-                    session_id: r.get(1)?,
-                    role: r.get(2)?,
-                    snippet: String::new(),
-                    rank: 0.0,
-                })
-            })
+            .query_map(
+                rusqlite::params![escaped, limit as i64, offset as i64],
+                |r| {
+                    Ok(SearchHit {
+                        message_id: r.get(0)?,
+                        session_id: r.get(1)?,
+                        role: r.get(2)?,
+                        snippet: String::new(),
+                        rank: 0.0,
+                    })
+                },
+            )
             .map_err(|_| StoreError::InvalidInput("search fallback failed".into()))?;
         Ok(rows.filter_map(|r| r.ok()).collect())
     }
+}
+
+/// Escape the LIKE metacharacters of a literal term (`%`, `_`, `\`) so a
+/// substring scan means "this literal is present", the way the FTS arm means it.
+fn escape_like(term: &str) -> String {
+    let mut out = String::with_capacity(term.len());
+    for c in term.chars() {
+        if matches!(c, '\\' | '%' | '_') {
+            out.push('\\');
+        }
+        out.push(c);
+    }
+    out
 }
 
 impl SessionStore for StockSqliteStore {
@@ -1623,7 +1657,10 @@ mod fts5_special_char_regression {
         }
         check("src/main.rs", &["src", "main", "rs"]);
         check("cost=5.50", &["cost", "5.50"]);
-        check("email a.b@example.com", &["email", "a", "b", "example", "com"]);
+        check(
+            "email a.b@example.com",
+            &["email", "a", "b", "example", "com"],
+        );
         check("note (see appendix)", &["note", "see", "appendix"]);
     }
 }
