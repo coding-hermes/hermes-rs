@@ -175,3 +175,33 @@ NOTES
   1093dfd above — and both answered the identical 21 MISS rows.
 * Criterion 2 (the zero-hit LIKE fallback must be a genuine fallback, not a
   replacement for FTS5) is evidenced separately in zero-hit-fallback.log.
+
+CRITERION 1 — the sanitizer's literal output, before and after
+--------------------------------------------------------------
+Measured with a throwaway print test appended to the sanitizer's own module in
+the SCRATCH tree (the repo tree is never touched for this), then run as:
+
+    CARGO_TARGET_DIR=/tmp/hrs-df105/prefix-target cargo test --lib \
+      print_sanitized_output -- --nocapture
+
+POST-FIX (stock_sqlite.rs copied from HEAD 6295059):
+
+    SANITIZED "src/main.rs" -> "src \"main.rs\""  tokens=["src", "\"main.rs\""]
+    SANITIZED "cost=5.50" -> "cost \"5.50\""  tokens=["cost", "\"5.50\""]
+    SANITIZED "a,b;c" -> "a b c"  tokens=["a", "b", "c"]
+    SANITIZED "path C:\\Users\\kara" -> "path C  Users kara"  tokens=["path", "C", "Users", "kara"]
+
+'src/main.rs' yields the two tokens 'src' and 'main.rs'; 'cost=5.50' yields
+'cost' and '5.50'. Step 5 then quotes the dotted token (\"main.rs\", \"5.50\"),
+which is the MATCH-syntax spelling of the literal the row holds.
+
+PRE-FIX (revision 1093dfd), the same probe:
+
+    SANITIZED "src/main.rs" -> "\"srcmain.rs\""  tokens=["\"srcmain.rs\""]
+    SANITIZED "cost=5.50" -> "\"cost5.50\""  tokens=["\"cost5.50\""]
+    SANITIZED "a,b;c" -> "abc"  tokens=["abc"]
+    SANITIZED "path C:\\Users\\kara" -> "path CUserskara"  tokens=["path", "CUserskara"]
+
+Each special character simply vanished, fusing the words on either side into one
+token no row contains — which step 5 then quoted as a phrase, so the query could
+only answer zero. Substituting a space is the whole fix.
