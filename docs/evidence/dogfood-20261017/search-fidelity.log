@@ -1,41 +1,177 @@
+DF-HRS-105 — search fidelity for FTS5-special characters
+========================================================
+This file replaces the stale matrix of the same name. Every number below was
+produced on this host by the exact commands in RUNNER, against a FRESH store
+with one row per test string.
+
+Host: karaHermes-mde-7840hs. Engine: rusqlite `bundled` (pinned amalgamation,
+FTS5 unicode61 index `messages_fts`); the system sqlite3 CLI 3.53.4 is used
+only by the probe's independent LIKE check. Adapter is the repo's Python-interop
+boundary binary (`specs/python-interop.md` §4).
+
+Revisions (hermes-rs, branch main):
+  1093dfd   pre-fix baseline
+  7138b0d   step 2 substitutes a SPACE for each FTS5-special char
+  99c7f40   zero-hit LIKE fallback
+  b35a594   tests/hrs105_search_fidelity.rs
+  6295059   LIKE arm: FTS visibility + literal presence (escaping)  <- probed here
+
+Adapter binary identity:
+  post-fix (6295059) sha256 ec35249e71aa95754ca9f54d9c3aa5b4ac14aa7be5e9b5756fa4b70a9c2211d4
+  pre-fix  (1093dfd) sha256 b11a25ce9812af7158434e728fe89ada88ea4d7bd7df4cd0e3f452585fc9c72a
+
+RUNNER (exact commands)
+-----------------------
+The command written in the task brief — `python3
+docs/evidence/dogfood-20261017/probe_fidelity.py.txt` — FAILS:
+
+    ModuleNotFoundError: No module named 'transcript_archive'
+      File "docs/evidence/dogfood-20261017/probe_fidelity.py.txt", line 26
+        from transcript_archive import Adapter, SpecError
+
+The probe imports its sibling module by name from its own directory, and the
+`.py.txt` evidence names are not importable. Stage the pair under their real
+names first, then run the probe:
+
+    mkdir -p /tmp/hrs-df105
+    cp docs/evidence/dogfood-20261017/transcript_archive.py.txt /tmp/hrs-df105/transcript_archive.py
+    cp docs/evidence/dogfood-20261017/probe_fidelity.py.txt   /tmp/hrs-df105/probe_fidelity.py
+
+    # post-fix matrix (HEAD 6295059)
+    cd /home/kara/hermes-rs
+    cargo build --bin hermes-rs-session-adapter
+    python3 /tmp/hrs-df105/probe_fidelity.py \
+      --adapter /var/tmp/hermes-cargo-target/debug/hermes-rs-session-adapter \
+      --db /tmp/hrs-df105/final1.db --leg search
+
+    # pre-fix baseline, built from revision 1093dfd in a scratch tree
+    mkdir -p /tmp/hrs-df105/prefix
+    cp -a src tests Cargo.toml Cargo.lock rust-toolchain.toml /tmp/hrs-df105/prefix/
+    git show 1093dfd:src/persistence/stock_sqlite.rs \
+      > /tmp/hrs-df105/prefix/src/persistence/stock_sqlite.rs
+    cd /tmp/hrs-df105/prefix
+    CARGO_TARGET_DIR=/tmp/hrs-df105/prefix-target cargo build --bin hermes-rs-session-adapter
+    python3 /tmp/hrs-df105/probe_fidelity.py \
+      --adapter /tmp/hrs-df105/prefix-target/debug/hermes-rs-session-adapter \
+      --db /tmp/hrs-df105/prefix1.db --leg search
+
+    # criterion 2 — the fallback probe (see zero-hit-fallback.log)
+    python3 /tmp/hrs-df105/probe_zero_hit_fallback.py \
+      --adapter /var/tmp/hermes-cargo-target/debug/hermes-rs-session-adapter \
+      --db /tmp/hrs-df105/final-fb.db
+
+POST-FIX (HEAD 6295059): 31/31 findable, 0 MISS
+----------------------------------------------
 verbatim query              search  sqlite LIKE  verdict
-src/main.rs                      0            2  MISS
-cost=5.50                        0            2  MISS
-ratio 50%                        2            2  ok
-#hashtag                         2            2  ok
-note (see appendix)              0            2  MISS
-a,b;c                            0            2  MISS
-ok!                             50            2  ok
-$5                              50            2  ok
-path C:\Users\kara               0            2  MISS
-quote 'single'                   2            2  ok
-email a.b@example.com            0            2  MISS
-v1.2.3-rc.1                      2            2  ok
-under_score                      2            2  ok
-dash-term                        2            2  ok
-tilde~x                          0            2  MISS
-amp&x                            0            2  MISS
-pipe|x                           0            2  MISS
-star*                            2            2  ok
-caret^x                          0            2  MISS
-at@x                             0            2  MISS
-bracket[x]                       0            2  MISS
-brace{x}                         0            2  MISS
-colon:x                          0            2  MISS
-slash/x                          0            2  MISS
-plus+x                           0            2  MISS
-back\slash                       0            2  MISS
-lt<x                             0            2  MISS
-gt>x                             0            2  MISS
-semi;x                           0            2  MISS
-bang!x                           0            2  MISS
-q?x                              0            2  MISS
+src/main.rs                      1            1  ok
+cost=5.50                        1            1  ok
+ratio 50%                        1            1  ok
+#hashtag                         1            1  ok
+note (see appendix)              1            1  ok
+a,b;c                            1            1  ok
+ok!                              1            1  ok
+$5                               2            1  ok
+path C:\Users\kara               1            1  ok
+quote 'single'                   1            1  ok
+email a.b@example.com            1            1  ok
+v1.2.3-rc.1                      1            1  ok
+under_score                      1            1  ok
+dash-term                        1            1  ok
+tilde~x                          1            1  ok
+amp&x                            1            1  ok
+pipe|x                           1            1  ok
+star*                            1            1  ok
+caret^x                          1            1  ok
+at@x                             1            1  ok
+bracket[x]                       1            1  ok
+brace{x}                         1            1  ok
+colon:x                          1            1  ok
+slash/x                          1            1  ok
+plus+x                           1            1  ok
+back\slash                       1            1  ok
+lt<x                             1            1  ok
+gt>x                             1            1  ok
+semi;x                           1            1  ok
+bang!x                           1            1  ok
+q?x                              1            1  ok
+
+-- zero-result discriminator: 'zzz-no-such-text-zzz' -> 0 hits; 'zzz/no-such/text' -> 0 hits
+
+`$5` answering 2 while its independent LIKE is 1 is the sanitized query `5` also
+matching the `5` token of `row 01: cost=5.50 end`. Verified directly, with:
+
+    sqlite3 final1.db "SELECT m.id, substr(m.content,1,32) FROM messages_fts \
+      JOIN messages m ON m.id=messages_fts.rowid \
+      WHERE messages_fts MATCH '5' ORDER BY m.id;"
+    -> 2|row 01: cost=5.50 end
+    -> 8|row 07: $5 end
+
+i.e. the FTS arm answered a broader term than the raw literal — a hit, not a
+miss.
+
+PRE-FIX (revision 1093dfd): 21/31 unfindable
+--------------------------------------------
+verbatim query              search  sqlite LIKE  verdict
+src/main.rs                      0            1  MISS
+cost=5.50                        0            1  MISS
+ratio 50%                        1            1  ok
+#hashtag                         1            1  ok
+note (see appendix)              1            1  ok
+a,b;c                            0            1  MISS
+ok!                              1            1  ok
+$5                               2            1  ok
+path C:\Users\kara               0            1  MISS
+quote 'single'                   1            1  ok
+email a.b@example.com            0            1  MISS
+v1.2.3-rc.1                      1            1  ok
+under_score                      1            1  ok
+dash-term                        1            1  ok
+tilde~x                          0            1  MISS
+amp&x                            0            1  MISS
+pipe|x                           0            1  MISS
+star*                            1            1  ok
+caret^x                          0            1  MISS
+at@x                             0            1  MISS
+bracket[x]                       0            1  MISS
+brace{x}                         0            1  MISS
+colon:x                          0            1  MISS
+slash/x                          0            1  MISS
+plus+x                           0            1  MISS
+back\slash                       0            1  MISS
+lt<x                             0            1  MISS
+gt>x                             0            1  MISS
+semi;x                           0            1  MISS
+bang!x                           0            1  MISS
+q?x                              0            1  MISS
 
 -- bisect on 'src/main.rs': search sub-tokens
    'src/main.rs' -> 0 hits
    'src/main rs' -> 0 hits
-   'src main.rs' -> 2 hits
+   'src main.rs' -> 1 hits
    'src/main.rs' -> 0 hits
-   LIKE whole-string present: 2
+   LIKE whole-string present: 1
 
 -- zero-result discriminator: 'zzz-no-such-text-zzz' -> 0 hits; 'zzz/no-such/text' -> 0 hits
+
+The bisect is the mechanism: adding a separator ONLY at the special character's
+position (`src main.rs`) finds the row, while both the fused form and the
+re-spaced form that does not respect the token boundary still answer 0. The
+fix substitutes a space for every special character, which is what upstream
+does (`_FTS5_SPECIAL_RE.sub(" ", sanitized)`, hermes_state_search.py:837).
+
+NOTES
+-----
+* The brief described this matrix as "19/31 MISS". The stale file it replaced
+  contained 22 MISS rows, and a fresh-store reproduction of the same revision
+  answers 21/31 MISS here. The stale run was driven against a store other legs
+  had already filled: its LIKE column reads 2 for every string, and its `search`
+  column hits the probe's limit of 50 for `ok!` and `$5` (the pre-fix query
+  `ok`/`5` matching many rows). All numbers in this file come from a fresh store
+  with one row per string, so they are mutually comparable; the three strings
+  that differ from the stale file are `note (see appendix)` (MISS -> ok),
+  `ok!` (50 -> 1) and `$5` (50 -> 2).
+* The pre-fix run of the SAME revision was reproduced twice — once with the
+  binary built from the then-HEAD working tree, once from the scratch build of
+  1093dfd above — and both answered the identical 21 MISS rows.
+* Criterion 2 (the zero-hit LIKE fallback must be a genuine fallback, not a
+  replacement for FTS5) is evidenced separately in zero-hit-fallback.log.
