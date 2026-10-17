@@ -1,0 +1,102 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.06s
+     Running unittests src/lib.rs (/var/tmp/hermes-cargo-target/debug/deps/hermes_rs-80aba058054d075b)
+
+running 3 tests
+test tests::reports_scaffold_status ... ok
+test persistence::stock_sqlite::fts5_special_char_regression::sanitize_fts5_query_preserves_special_char_boundaries ... ok
+test persistence::stock_sqlite::fts5_special_char_regression::sanitize_preserves_original_substrings ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (/var/tmp/hermes-cargo-target/debug/deps/hermes_rs-2ed13f3d9c83212b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/session_adapter.rs (/var/tmp/hermes-cargo-target/debug/deps/hermes_rs_session_adapter-1c43223fb64b40ef)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/cli.rs (/var/tmp/hermes-cargo-target/debug/deps/cli-4ef2ef0b9425c9de)
+
+running 1 test
+test executable_prints_the_library_scaffold_status ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/hrs003_python_interop.rs (/var/tmp/hermes-cargo-target/debug/deps/hrs003_python_interop-cb88e9d2dba4b082)
+
+running 5 tests
+test hrs003_protocol_unknown_method_fails_closed_nonzero ... ok
+test hrs003_protocol_malformed_json_fails_closed_nonzero ... ok
+test hrs003_protocol_hello_reports_boundary_and_schema ... ok
+test hrs003_broken_case_fails_and_evidence_is_written ... ok
+test hrs003_python_roundtrip_and_sqlite_readback ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.96s
+
+     Running tests/hrs009_backend_parity.rs (/var/tmp/hermes-cargo-target/debug/deps/hrs009_backend_parity-842d75ab3986a3e0)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/hrs009_crash_child.rs (/var/tmp/hermes-cargo-target/debug/deps/hrs009_crash_child-04f7ffb2ee395de0)
+
+running 1 test
+test crash_child ... ignored, crash-child harness: driven by p7_kill9 via --exact with args
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/hrs010_session_store.rs (/var/tmp/hermes-cargo-target/debug/deps/hrs010_session_store-01ad00419e7c4bd4)
+
+running 23 tests
+test f1_read_only_open_leaves_the_file_byte_identical ... ok
+test f2_fts_search_finds_unique_token_with_bm25_and_snippet ... ok
+test f1_fixture_opens_and_recognizes_schema_v31 ... ok
+test f2_reads_exact_fixture_rows_from_python_produced_db ... ok
+test f2_rust_write_then_sqlite3_reads_the_same_file ... ok
+test compression_closed_session_refuses_appends ... ok
+test f8_backup_snapshot_restores_and_reopens ... ok
+test f9_generation_counter_increments_and_never_decrements ... ok
+test slice_end_session_on_fresh_keyed_session_bumps_generation_once ... ok
+test stale_fts_marker_serves_canonical_rows_not_partial_search ... ok
+test capability_gate_returns_unsupported_not_silent_degradation ... ok
+test append_into_missing_session_is_session_row_missing ... ok
+test recovery_garbage_header_is_quarantined ... ok
+test recovery_zeroed_file_is_quarantined_never_silently_rewritten ... ok
+test migration_newer_schema_version_is_refused_not_downgraded ... ok
+test slice_append_message_assigns_durable_rowids_and_moves_counters_atomically ... ok
+test f5_passive_checkpoint_policy_and_wal_hygiene ... ok
+test f3_slice_scale_acknowledged_writes_survive_close_and_reopen ... ok
+test slice_ensure_session_upsert_never_overwrites_and_replaces_unknown_source ... ok
+test slice_end_session_first_reason_wins_and_generation_semantics ... ok
+test slice_record_model_usage_upserts_and_falls_back_to_session_route ... ok
+test test_fts5_query_operator_safety ... ok
+test transaction_rollback_discards_all_or_nothing ... ok
+
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.46s
+
+     Running tests/hrs105_search_fidelity.rs (/var/tmp/hermes-cargo-target/debug/deps/hrs105_search_fidelity-c0388278df83f148)
+
+running 4 tests
+test df105_zero_hit_like_fallback_is_a_fallback_not_a_replacement ... ok
+test df105_fallback_requires_literal_presence_not_a_wildcard_match ... ok
+test df105_fidelity_matrix_all_31_verbatim_strings_are_findable ... ok
+test df105_fallback_serves_the_same_rows_as_the_fts_arm ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.89s
+
+   Doc-tests hermes_rs
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+# command: cd /home/kara/hermes-rs && cargo test --workspace
+# host: karaHermes-mde-7840hs  sqlite3=/home/kara/.local/bin/sqlite3
+# revision: 3f22a78
+# totals: 36 passed; 0 failed; 1 ignored

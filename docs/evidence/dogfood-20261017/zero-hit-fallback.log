@@ -1,0 +1,111 @@
+DF-HRS-105 criterion 2 — the zero-hit LIKE fallback is a FALLBACK, not a replacement
+===================================================================================
+The acceptance criterion: "when the FTS5 search yields 0 hits but the RAW
+(unsanitized) query term is present in the store's messages table, serve the
+results from the LIKE arm instead. This must be a genuine fallback (only when
+FTS returns empty), not a replacement for FTS5."
+
+Three discriminating cases, driven through the Python consumer boundary
+(`specs/python-interop.md` §4) exactly like probe_fidelity.py, plus the Rust
+regression tests in `tests/hrs105_search_fidelity.rs`.
+
+RUNNER (exact commands)
+-----------------------
+    # stage the probe under its importable name (.py.txt evidence convention)
+    mkdir -p /tmp/hrs-df105
+    cp docs/evidence/dogfood-20261017/transcript_archive.py.txt \
+       /tmp/hrs-df105/transcript_archive.py
+    cp docs/evidence/dogfood-20261017/probe_zero_hit_fallback.py.txt \
+       /tmp/hrs-df105/probe_zero_hit_fallback.py
+
+    # post-fix (HEAD 6295059 / 3f22a78)
+    cd /home/kara/hermes-rs
+    cargo build --bin hermes-rs-session-adapter
+    python3 /tmp/hrs-df105/probe_zero_hit_fallback.py \
+      --adapter /var/tmp/hermes-cargo-target/debug/hermes-rs-session-adapter \
+      --db /tmp/hrs-df105/final-fb.db
+
+    # pre-fix (revision 1093dfd, scratch tree built in search-fidelity.log RUNNER)
+    python3 /tmp/hrs-df105/probe_zero_hit_fallback.py \
+      --adapter /tmp/hrs-df105/prefix-target/debug/hermes-rs-session-adapter \
+      --db /tmp/hrs-df105/fallback-prefix.db
+
+POST-FIX — 4/4 as expected
+--------------------------
+case  query                     search  raw-LIKE  expected  verdict
+  A   alpha!                        2         1         2  ok (fallback must NOT replace FTS5 (2 = FTS answers))
+  B   ok!                           1         1         1  ok (fallback must fire (raw term present, FTS5 token differs))
+  C   zzz-no-such-text-zzz          0         0         0  ok (honest zero stays zero)
+  C   zzz/no-such/text              0         0         0  ok (honest zero stays zero)
+
+FAILURES: 0
+
+PRE-FIX (1093dfd) — CASE B fails, the fallback does not exist
+-------------------------------------------------------------
+case  query                     search  raw-LIKE  expected  verdict
+  A   alpha!                        2         1         2  ok (fallback must NOT replace FTS5 (2 = FTS answers))
+  B   ok!                           0         1         1  FAIL (fallback must fire (raw term present, FTS5 token differs))
+  C   zzz-no-such-text-zzz          0         0         0  ok (honest zero stays zero)
+  C   zzz/no-such/text              0         0         0  ok (honest zero stays zero)
+
+FAILURES: 1
+  ('B', 'ok!', 0, 1, 1, 1)
+
+CASE A is the discriminating control in both directions: rows `case A alpha
+marker row` and `case A alpha!beta marker row`, queried with `alpha!`. The
+sanitized query is `alpha`, which the FTS5 arm answers with BOTH rows (2), while
+the raw term `alpha!` is present in only one (raw-LIKE 1). A replacement-shaped
+implementation answers 1; a genuine fallback answers 2. It answers 2 before and
+after the fix — the fallback never runs on a query MATCH can answer.
+
+CASE B is the fallback's own RED arm: `aok!x` indexes (unicode61) as the tokens
+`aok` and `x`, so the sanitized query `ok` matches neither token, while the
+literal `ok!` is in the row. Pre-fix: 0 hits. Post-fix: 1 hit.
+
+RUST REGRESSION COVERAGE (tests/hrs105_search_fidelity.rs)
+--------------------------------------------------------
+RED arms were run by copying the committed test file into scratch trees built
+from each revision, with a private CARGO_TARGET_DIR:
+
+    # .../prefix is the 1093dfd tree from search-fidelity.log RUNNER
+    cp tests/hrs105_search_fidelity.rs /tmp/hrs-df105/prefix/tests/
+    cd /tmp/hrs-df105/prefix
+    CARGO_TARGET_DIR=/tmp/hrs-df105/prefix-target cargo test --test hrs105_search_fidelity
+
+  revision 1093dfd (pre-fix):         0 passed; 4 failed
+    df105_fidelity_matrix_all_31_verbatim_strings_are_findable FAILED
+      — "21/31 fidelity strings unfindable (floor: <=6 misses, pre-fix 21)"
+    df105_zero_hit_like_fallback_is_a_fallback_not_a_replacement FAILED
+    df105_fallback_requires_literal_presence_not_a_wildcard_match FAILED
+    df105_fallback_serves_the_same_rows_as_the_fts_arm FAILED
+
+  revision 99c7f40 (fallback landed, no visibility / no escaping):
+      2 passed; 2 failed
+    df105_fallback_requires_literal_presence_not_a_wildcard_match FAILED
+      — assertion `left == right` failed: left: [1, 2]  right: [2]
+        (the unescaped pattern `%ok_x%` wildcard-matched `aokXx`, a row that
+         does not contain the literal — a hit for text the store does not hold)
+    df105_fallback_serves_the_same_rows_as_the_fts_arm FAILED
+      — the `display_kind='hidden'` row was served through the fallback
+        (the FTS arm had filtered it out, which is exactly why MATCH returned
+         zero and the fallback fired)
+
+  revision 6295059 (this task's final source state): 4 passed; 0 failed
+    Full suite at that revision: `cargo test --workspace` 36 passed, 0 failed,
+    1 ignored (see cargo-test-after-fix.log); `cargo test --workspace
+    --all-features` 46 passed, 0 failed, 1 ignored.
+
+WHY THE TWO TIGHTENINGS ARE LOAD-BEARING
+----------------------------------------
+The fallback answers the same question as the FTS arm, so it must serve the same
+ROW SET and mean the same thing by "present":
+
+  * visibility — the FTS arm filters `(active = 1 OR compacted = 1) AND
+    COALESCE(display_kind,'') <> 'hidden'`; the LIKE arm did not, so a hidden
+    scaffolding row or a rewound row came back through the fallback exactly on
+    the queries MATCH could not answer. Upstream applies
+    `_search_filter_clauses` on every route including LIKE
+    (hermes_state_search.py:163-190), and the stale arm in this file and the
+    Turso backend already filter the same way.
+  * literal presence — `%`, `_` and `\` are escaped (`ESCAPE '\'`), so a user
+    term can no longer wildcard-match a row that does not contain it.

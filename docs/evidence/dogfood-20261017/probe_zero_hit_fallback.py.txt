@@ -1,0 +1,92 @@
+#!/usr/bin/env python3
+"""DF-HRS-105 criterion-2 probe: is the LIKE arm a genuine FALLBACK (only when
+FTS5 returns nothing), or does it replace the FTS5 route?
+
+Three discriminating cases, driven through the Python consumer boundary
+(specs/python-interop.md §4) exactly like probe_fidelity.py:
+
+  CASE A — FTS5 hits AND raw LIKE would return FEWER rows.
+    Rows 'alpha' and 'alpha!beta'; query 'alpha!' sanitizes to 'alpha', so the
+    FTS5 arm matches BOTH rows, while the RAW term 'alpha!' is present in only
+    ONE. A replacement-shaped implementation answers 1; a genuine fallback
+    answers 2.
+
+  CASE B — FTS5 misses, RAW term present (the fallback must fire).
+    Row 'aok!x': unicode61 indexes the tokens 'aok' and 'x' — '!' is no
+    boundary — so the sanitized query 'ok' cannot match either token, while
+    the literal 'ok!' IS present in the row. Pre-fix (no fallback): 0 hits.
+    With the fallback: 1 hit.
+
+  CASE C — negative control: FTS5 misses, RAW term genuinely absent.
+    'zzz-no-such-text-zzz' and 'zzz/no-such/text' must stay 0, so a zero is
+    still a distinguishable, honest answer.
+"""
+
+from __future__ import annotations
+
+import os
+import sqlite3
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from transcript_archive import Adapter  # noqa: E402
+
+SID = "20261017_140000_df105fallback"
+ROWS = [
+    "case A Alpha marker row",
+    "case A alpha!beta marker row",
+    "case B aok!x marker row",
+]
+
+
+def main() -> int:
+    import argparse
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--adapter", required=True)
+    ap.add_argument("--db", default="/tmp/hrs-df105/fallback.db")
+    args = ap.parse_args()
+
+    with Adapter(args.adapter) as a:
+        a.open(args.db, create=not os.path.exists(args.db))
+        a.ensure_session(SID, source="df105-fallback", model="m")
+        for i, text in enumerate(ROWS):
+            a.append_message(SID, role="user", content=f"row {i:02d}: {text} end")
+        a.call("checkpoint")
+
+        con = sqlite3.connect(args.db)
+
+        def like(term):
+            return con.execute(
+                "SELECT COUNT(*) FROM messages WHERE content LIKE '%' || ? || '%'", (term,)
+            ).fetchone()[0]
+
+        print("case  query                     search  raw-LIKE  expected  verdict")
+        cases = [
+            ("A", "alpha!", 2, 1, "fallback must NOT replace FTS5 (2 = FTS answers)"),
+            ("B", "ok!", 1, 1, "fallback must fire (raw term present, FTS5 token differs)"),
+            ("C", "zzz-no-such-text-zzz", 0, 0, "honest zero stays zero"),
+            ("C", "zzz/no-such/text", 0, 0, "honest zero stays zero"),
+        ]
+        failures = []
+        for tag, query, expect, like_expected, note in cases:
+            hits = len(a.search(query, limit=50)["hits"])
+            got_like = like(query)
+            ok = hits == expect and got_like == like_expected
+            if not ok:
+                failures.append((tag, query, hits, expect, got_like, like_expected))
+            print(
+                f"  {tag}   {query:<24} {hits:>6} {got_like:>9}  {expect:>8}  "
+                f"{'ok' if ok else 'FAIL'} ({note})"
+            )
+        con.close()
+        a.close_store()
+
+    print(f"\nFAILURES: {len(failures)}")
+    for f in failures:
+        print(f"  {f}")
+    return 1 if failures else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
