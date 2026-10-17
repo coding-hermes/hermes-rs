@@ -1076,18 +1076,37 @@ fn sanitize_fts5_query(query: &str) -> String {
     while sanitized.starts_with('*') || sanitized.starts_with(" *") {
         sanitized = sanitized[1..].to_string();
     }
-    // 4. Drop dangling boolean operators at start/end.
+    // 4. Drop dangling boolean operators at start/end — whole tokens only
+    //    (DF-HRS-104). Matching the raw string with starts_with/ends_with
+    //    chopped an operator's worth of characters off any WORD that merely
+    //    begins or ends with one: `notes` → `es`, `nothing` → `hing`,
+    //    `android` → `roid`, `order` → `der`, `brand` → `br`, `band` → `b`,
+    //    `command` → `co`. The store then searched a different term and
+    //    answered zero hits for text that is present — a silent wrong answer.
+    //    Only a whitespace-delimited token that IS `and`/`or`/`not`
+    //    (ASCII-case-insensitive) counts as an operator, and never so far as
+    //    to empty the query: a query that is nothing but an operator token is a
+    //    valid single-term query (FTS5 matches the literal word), so emptying
+    //    it would turn a real hit into the same silent miss.
     let mut trimmed = sanitized.trim().to_string();
-    for op in ["AND", "OR", "NOT"] {
-        let lower = trimmed.to_lowercase();
-        if lower.starts_with(&op.to_lowercase()) {
-            let rest = trimmed[op.len()..].trim_start().to_string();
-            trimmed = rest;
+    let tokens: Vec<&str> = trimmed.split_whitespace().collect();
+    if tokens.len() > 1 {
+        let is_operator = |t: &str| {
+            ["AND", "OR", "NOT"]
+                .iter()
+                .any(|op| t.eq_ignore_ascii_case(op))
+        };
+        let mut first = 0usize;
+        let mut last = tokens.len();
+        while first + 1 < last && is_operator(tokens[first]) {
+            first += 1;
         }
-        let lower = trimmed.to_lowercase();
-        if lower.ends_with(&op.to_lowercase()) {
-            let cut = trimmed.len() - op.len();
-            trimmed = trimmed[..cut].trim_end().to_string();
+        while last > first + 1 && is_operator(tokens[last - 1]) {
+            last -= 1;
+        }
+        if first > 0 || last < tokens.len() {
+            let retained = tokens[first..last].join(" ");
+            trimmed = retained;
         }
     }
     // 5. Quote dotted/hyphenated/underscored terms in one pass.

@@ -10,7 +10,8 @@ use std::path::PathBuf;
 
 use hermes_rs::persistence::{
     AppendMessage, Capability, CapabilitySupport, EndSessionOutcome, ModelUsageDelta, OpenOptions,
-    Patience, PersistenceError, SchemaNeed, SessionStore, StockSqliteBackend, StoreError,
+    Patience, PersistenceError, SchemaNeed, SearchHit, SessionStore, StockSqliteBackend,
+    StoreError,
 };
 
 const FIXTURE: &str = "tests/fixtures/hrs010/state.db";
@@ -217,6 +218,145 @@ fn f2_fts_search_finds_unique_token_with_bm25_and_snippet() {
         })
         .expect("sanitized search does not error");
     assert!(none.is_empty());
+    drop(store);
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// DF-HRS-104: the dangling-boolean-operator strip must compare WHOLE
+// whitespace-delimited tokens, never raw string prefixes/suffixes. `brand`,
+// `notes`, `nothing`, `notable`, `android`, `order`, `oracle`, `band` and
+// `command` are ordinary words that merely spell `and`/`or`/`not` at one
+// edge; the old `starts_with`/`ends_with` strip cut the leading three
+// characters off the former and the trailing three off the latter, so the
+// store searched a DIFFERENT term and answered zero hits for text that is
+// present — a silent wrong answer, indistinguishable from a genuine miss
+// (docs/evidence/dogfood-20261017/opbug.log, wrong-answer.log).
+// ────────────────────────────────────────────────────────────────────────
+
+#[test]
+fn test_fts5_query_operator_safety() {
+    let path = scratch("fts-op-safety");
+    let (store, _open) = StockSqliteBackend::open(OpenOptions::read_write(&path)).unwrap();
+    let sid = "20261017_120000_ffeedd";
+    // Every probe word below is a token of exactly ONE row, so a correct
+    // search returns that row's id and nothing else (`cases` maps them).
+    let rows = [
+        "row A: bra measurements only",
+        "row B: brand measurements only",
+        "the command failed twice",
+        "notes about the incident",
+        "nothing shipped this week",
+        "notable exceptions in the log",
+        "android client crashed on launch",
+        "order of operations changed",
+        "oracle schema diff is clean",
+        "band measurements only",
+        "salt and pepper",
+        "this or that",
+        "not a token",
+    ];
+    let ids: Vec<i64> = store
+        .write(
+            Patience::WRITE,
+            &mut |tx: &mut dyn hermes_rs::persistence::WriteTxn| {
+                tx.ensure_session(sid, "cli", Some("glm-5.3-flash"))?;
+                let mut ids = Vec::new();
+                for content in rows {
+                    ids.push(tx.append_message(
+                        sid,
+                        &AppendMessage {
+                            role: "user".into(),
+                            content: Some(content.into()),
+                            ..Default::default()
+                        },
+                    )?);
+                }
+                Ok(ids)
+            },
+        )
+        .expect("seed operator-safety rows");
+    assert_eq!(ids.len(), rows.len(), "every row got a durable id");
+
+    let find = |query: &str| -> Vec<SearchHit> {
+        store
+            .read(&mut |tx: &mut dyn hermes_rs::persistence::ReadTxn| {
+                tx.search_messages(query, 20, 0)
+            })
+            .unwrap_or_else(|e| panic!("search {query:?} errored: {e:?}"))
+    };
+
+    // Acceptance: searching "brand" finds the row containing "brand
+    // measurements only" (the bug answered 0), and the sibling "bra" row is
+    // found by "bra" — the two are never conflated by a shortened query.
+    let brand = find("brand");
+    assert_eq!(
+        brand.iter().map(|h| h.message_id).collect::<Vec<_>>(),
+        vec![ids[1]],
+        "DF-HRS-104: 'brand' must find the brand row, not 0 hits and not 'bra'"
+    );
+    assert!(
+        brand[0].snippet.contains("brand"),
+        "snippet: {}",
+        brand[0].snippet
+    );
+    assert_eq!(
+        find("bra").iter().map(|h| h.message_id).collect::<Vec<_>>(),
+        vec![ids[0]],
+        "'bra' still finds the 'bra' row"
+    );
+
+    // Whole-token operator safety: each word only LOOKS like an operator at
+    // one edge. Pre-fix every entry here answered zero hits.
+    let cases: [(&str, usize); 14] = [
+        ("notes", 3),
+        ("nothing", 4),
+        ("notable", 5),
+        ("android", 6),
+        ("order", 7),
+        ("oracle", 8),
+        ("command", 2),
+        ("the command", 2), // trailing word ENDING in "and" (was → "comm")
+        ("band", 9),        // trailing "and" (was → "b")
+        ("and", 10),        // a bare operator token is still a real word
+        ("or", 11),
+        ("not", 12),
+        ("bra", 0),
+        ("brand", 1),
+    ];
+    for (query, row) in cases {
+        let hits = find(query);
+        assert_eq!(
+            hits.iter().map(|h| h.message_id).collect::<Vec<_>>(),
+            vec![ids[row]],
+            "query {query:?} must find row {row} ({:?}), got {} hits",
+            rows[row],
+            hits.len()
+        );
+        assert_eq!(hits[0].session_id, sid);
+    }
+
+    // A genuinely dangling operator — a COMPLETE token at either end — is
+    // still dropped so the rest of the query is searched. Without the strip
+    // these four answer 0: no single row contains both words.
+    for (query, row) in [
+        ("and notes", 3),
+        ("notes and", 3),
+        ("or notable", 5),
+        ("not nothing", 4),
+    ] {
+        assert_eq!(
+            find(query).iter().map(|h| h.message_id).collect::<Vec<_>>(),
+            vec![ids[row]],
+            "dangling operator in {query:?} must be dropped (row {row} expected)"
+        );
+    }
+
+    // Negative control: no row holds both words, and a LEADING word that
+    // merely ends in "and" is not a dangling operator — 0 hits, no rewrite.
+    assert!(
+        find("command prompt").is_empty(),
+        "'command prompt' matches no row (opbug.log parity)"
+    );
     drop(store);
 }
 
