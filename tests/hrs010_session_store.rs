@@ -17,6 +17,56 @@ use hermes_rs::persistence::{
 const FIXTURE: &str = "tests/fixtures/hrs010/state.db";
 const MANIFEST: &str = "tests/fixtures/hrs010/manifest.json";
 
+// ────────────────────────────────────────────────────────────────────────
+// DF-HRS-110: five tests below re-verify the Rust-written file with the
+// SYSTEM `sqlite3` CLI — deliberately a different SQLite build than the one
+// the crate links, so it is real stock-file compatibility evidence. That CLI
+// is not present on every machine (it is optional for the build), and the
+// unconditional `Command::new("sqlite3").expect(..)` made the README's own
+// smoke verb `cargo test` fail with `Os { code: 2, kind: NotFound }` on a
+// bare box. Those five tests now detect the missing CLI and skip with a
+// recorded reason instead of panicking; on a machine that has the CLI they
+// run exactly as before.
+// ────────────────────────────────────────────────────────────────────────
+
+/// True when a usable `sqlite3` CLI is on PATH (a missing binary, a
+/// non-executable stub or a non-zero `--version` all count as "absent").
+fn has_sqlite3_cli() -> bool {
+    std::process::Command::new("sqlite3")
+        .arg("--version")
+        .output()
+        .map(|out| out.status.success())
+        .unwrap_or(false)
+}
+
+/// Answer whether the caller must return early because the `sqlite3` CLI is
+/// absent, recording the reason where a human can find it: std's test harness
+/// captures stderr from a *passing* test, so the reason is written to stderr
+/// (visible under `--nocapture`) and appended to `hrs010-skipped-tests.log` in
+/// the Cargo target directory (visible always, even on a green run).
+fn skip_without_sqlite3_cli(test: &str) -> bool {
+    if has_sqlite3_cli() {
+        return false;
+    }
+    let reason = format!(
+        "SKIPPED: {test} — sqlite3 CLI not available on this machine (required for full F-2/F-10 stock-file verification)"
+    );
+    eprintln!("{reason}");
+    let dir = std::env::var_os("CARGO_TARGET_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target"));
+    let _ = std::fs::create_dir_all(&dir);
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(dir.join("hrs010-skipped-tests.log"))
+    {
+        use std::io::Write;
+        let _ = writeln!(f, "{reason}");
+    }
+    true
+}
+
 /// Per-test scratch dir with a fixture COPY (byte-frozen original untouched).
 fn fixture_copy(tag: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!(
@@ -368,6 +418,9 @@ fn test_fts5_query_operator_safety() {
 
 #[test]
 fn f2_rust_write_then_sqlite3_reads_the_same_file() {
+    if skip_without_sqlite3_cli("f2_rust_write_then_sqlite3_reads_the_same_file") {
+        return;
+    }
     let path = fixture_copy("f2interop");
     let (mut store, _open) = StockSqliteBackend::open(OpenOptions::read_write(&path)).unwrap();
     store
@@ -627,6 +680,9 @@ fn slice_end_session_on_fresh_keyed_session_bumps_generation_once() {
 
 #[test]
 fn f9_generation_counter_increments_and_never_decrements() {
+    if skip_without_sqlite3_cli("f9_generation_counter_increments_and_never_decrements") {
+        return;
+    }
     // conversation_generations is keyed per (source, session_key) upstream.
     // The fixture carries one row: (cli, tg:1003310984808:2, 1) — bumped by
     // the reference on the 'idle' end. A reset-class end on a NEW telegram
@@ -723,6 +779,10 @@ fn generation_for(path: &PathBuf, source: &str, key: &str) -> Option<i64> {
 
 #[test]
 fn slice_record_model_usage_upserts_and_falls_back_to_session_route() {
+    if skip_without_sqlite3_cli("slice_record_model_usage_upserts_and_falls_back_to_session_route")
+    {
+        return;
+    }
     let path = scratch("usage");
     let (store, _open) = StockSqliteBackend::open(OpenOptions::read_write(&path)).unwrap();
     store
@@ -810,6 +870,9 @@ fn usage_rows(path: &PathBuf) -> Vec<(String, i64, i64)> {
 
 #[test]
 fn migration_newer_schema_version_is_refused_not_downgraded() {
+    if skip_without_sqlite3_cli("migration_newer_schema_version_is_refused_not_downgraded") {
+        return;
+    }
     let path = scratch("newer");
     // Build a store, then advance its version beyond what we know.
     let (store, _open) = StockSqliteBackend::open(OpenOptions::read_write(&path)).unwrap();
@@ -1113,6 +1176,9 @@ fn capability_gate_returns_unsupported_not_silent_degradation() {
 
 #[test]
 fn stale_fts_marker_serves_canonical_rows_not_partial_search() {
+    if skip_without_sqlite3_cli("stale_fts_marker_serves_canonical_rows_not_partial_search") {
+        return;
+    }
     let path = fixture_copy("stale");
     // Set the upstream staleness marker (simulated stale index, F-6 leg).
     let mark = std::process::Command::new("sqlite3")

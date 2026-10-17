@@ -29,6 +29,15 @@ cargo test
 
 The test suite includes library unit coverage and an integration test that runs the built executable. There is no published package or installation command yet; build and run the scaffold from this repository.
 
+Optional: the test suite runs additional file-compatibility checks against the system `sqlite3` CLI (a different SQLite build than the one the crate links). It is not required to build or to run the core suite, but install it if you want full test coverage — the tests that require it detect its absence and skip with a recorded reason instead of failing:
+
+```sh
+# Debian/Ubuntu
+sudo apt-get install -y sqlite3
+```
+
+Skipped tests are reported on stderr (visible with `cargo test -- --nocapture`) and appended to `hrs010-skipped-tests.log` in the Cargo target directory (default `target/`).
+
 ## License
 
 MIT. See `LICENSE`.
