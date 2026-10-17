@@ -27,6 +27,11 @@ const MANIFEST: &str = "tests/fixtures/hrs010/manifest.json";
 // bare box. Those five tests now detect the missing CLI and skip with a
 // recorded reason instead of panicking; on a machine that has the CLI they
 // run exactly as before.
+//
+// The guard is deliberately a RUNTIME check, never `#[ignore]`: `#[ignore]`
+// would disable these five tests on every machine, including the ones that DO
+// have the CLI, silently retiring the F-2/F-10 stock-file verification the
+// tests exist to provide. Only the absence of the CLI may skip them.
 // ────────────────────────────────────────────────────────────────────────
 
 /// True when a usable `sqlite3` CLI is on PATH (a missing binary, a
