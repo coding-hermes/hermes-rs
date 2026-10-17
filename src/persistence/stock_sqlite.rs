@@ -1351,6 +1351,14 @@ impl<'a> ReadTxn for SqliteReadTxn<'a> {
                 match rows {
                     Ok(rows) => {
                         let collected: Vec<SearchHit> = rows.filter_map(|r| r.ok()).collect();
+                        // DF-HRS-105: FTS5 zero hits after sanitization can mean
+                        // the raw term is genuinely absent OR the query was
+                        // mangled. Fall back to LIKE on the raw term so the user
+                        // gets results when the text is present but FTS5
+                        // misparsed the query.
+                        if collected.is_empty() {
+                            return self.like_fallback(&like_term, limit, offset);
+                        }
                         Ok(collected)
                     }
                     Err(e) => match classify(&e) {
