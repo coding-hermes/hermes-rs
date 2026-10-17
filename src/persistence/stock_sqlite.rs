@@ -1051,7 +1051,17 @@ fn sanitize_fts5_query(query: &str) -> String {
         '+', '{', '}', '(', ')', ':', '"', '^', '@', '/', '#', '&', '|', '~', '[', ']', '<', '>',
         ',', ';', '!', '?', '$', '=', '\\', '\'',
     ];
-    let mut sanitized: String = sanitized.chars().filter(|c| !SPECIAL.contains(c)).collect();
+    // DF-HRS-105: substitute a space for each special char instead of
+    // deleting it.  Deletion merged adjacent words into non-existent tokens
+    // (e.g. 'src/main.rs' → 'srcmain.rs').  A space preserves token
+    // boundaries so FTS5 can match both 'src' and 'main.rs'.
+    let mut sanitized: String = sanitized.chars().map(|c| {
+        if SPECIAL.contains(&c) {
+            ' '
+        } else {
+            c
+        }
+    }).collect();
     if !sanitized.chars().any(|c| {
         let cp = c as u32;
         (0x4E00..=0x9FFF).contains(&cp) || (0x3400..=0x4DBF).contains(&cp)
@@ -1532,5 +1542,80 @@ pub fn require(capabilities: &Capabilities, c: Capability) -> Result<(), Persist
             let _ = reason;
             Err(PersistenceError::Unsupported { capability: c })
         }
+    }
+}
+#[cfg(test)]
+mod fts5_special_char_regression {
+    use super::*;
+
+    /// DF-HRS-105 regression: sanitize_fts5_query must preserve token boundaries
+    /// when replacing FTS5-special characters with spaces (not deleting them).
+    #[test]
+    fn sanitize_fts5_query_preserves_special_char_boundaries() {
+        let cases = [
+            "src/main.rs",
+            "cost=5.50",
+            "email a.b@example.com",
+            "path C:\\Users\\kara",
+            "note (see appendix)",
+            "a,b;c",
+            "tilde~x",
+            "amp&x",
+            "pipe|x",
+            "caret^x",
+            "at@x",
+            "bracket[x]",
+            "brace{x}",
+            "colon:x",
+            "slash/x",
+            "plus+x",
+            "back\\slash",
+            "lt<x",
+            "gt>x",
+            "semi;x",
+            "bang!x",
+            "q?x",
+        ];
+        for input in cases {
+            let result = sanitize_fts5_query(input);
+            let tokens: Vec<&str> = result.split_whitespace().collect();
+            assert!(
+                !tokens.is_empty(),
+                "sanitize_fts5_query({:?}) produced empty query",
+                input
+            );
+            if input.contains('/') || input.contains('=') || input.contains('\\') {
+                assert!(
+                    tokens.len() >= 2,
+                    "sanitize_fts5_query({:?}) produced {} token(s): {:?} — tokens must be split at special chars",
+                    input,
+                    tokens.len(),
+                    tokens
+                );
+            }
+        }
+    }
+
+    /// DF-HRS-105: sanitized queries preserve original word substrings
+    /// so FTS5 index can match them. Uses a helper that takes &[_].
+    #[test]
+    fn sanitize_preserves_original_substrings() {
+        fn check(input: &str, expected: &[&str]) {
+            let result = sanitize_fts5_query(input);
+            let lower = result.to_lowercase();
+            for sub in expected {
+                assert!(
+                    lower.contains(&sub.to_lowercase()),
+                    "sanitize_fts5_query({:?}) = {:?} must contain substring {:?} but does not",
+                    input,
+                    result,
+                    sub
+                );
+            }
+        }
+        check("src/main.rs", &["src", "main", "rs"]);
+        check("cost=5.50", &["cost", "5.50"]);
+        check("email a.b@example.com", &["email", "a", "b", "example", "com"]);
+        check("note (see appendix)", &["note", "see", "appendix"]);
     }
 }
