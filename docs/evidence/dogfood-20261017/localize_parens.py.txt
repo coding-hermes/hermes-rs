@@ -1,0 +1,74 @@
+#!/usr/bin/env python3
+"""Localize the parens-case divergence: adapter vs the product's own SQL."""
+from __future__ import annotations
+
+import sqlite3
+import sys
+import os
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from transcript_archive import Adapter  # noqa: E402
+
+db = sys.argv[1]
+ad = sys.argv[2]
+RUST_SQL = """
+SELECT m.id, m.session_id, m.role,
+       snippet(messages_fts, -1, '>>>', '<<<', '...', 40) AS snippet, rank
+FROM messages_fts
+JOIN messages m ON m.id = messages_fts.rowid
+JOIN sessions s ON s.id = m.session_id
+WHERE messages_fts MATCH ?1 AND (m.active = 1 OR m.compacted = 1)
+      AND COALESCE(m.display_kind, '') <> 'hidden'
+ORDER BY rank LIMIT ?2 OFFSET ?3
+"""
+
+con = sqlite3.connect(db)
+variants = [
+    "note (see appendix)",
+    "note see appendix",
+    "note  see appendix",
+    "(see appendix)",
+    "see appendix",
+    "appendix",
+    "row 03: note (see appendix) end",
+    "src/main.rs",
+    '"src/main.rs"',
+    "src main rs",
+]
+with Adapter(ad) as a:
+    a.open(db, create=False)
+    print(f"{'query':<38} {'adapter':>7} {'full-rust-SQL':>13}")
+    for q in variants:
+        hits = len(a.search(q, limit=50)["hits"])
+        try:
+            sql = con.execute(RUST_SQL, (q, 50, 0)).fetchall()
+            sql_n = len(sql)
+        except sqlite3.Error as e:
+            sql_n = f"ERR {e}"
+        print(f"{q!r:<38} {hits:>7} {str(sql_n):>13}")
+
+    # which rows does the index actually hold for these tokens?
+    print("\nrows in messages_fts matching single tokens (quoted):")
+    for tok in ("note", "see", "appendix", "srcmain.rs", "src", "main", "rs"):
+        try:
+            n = con.execute("SELECT COUNT(*) FROM messages_fts WHERE messages_fts MATCH ?",
+                            (f'"{tok}"',)).fetchone()[0]
+        except sqlite3.Error as e:
+            n = f"ERR {e}"
+        print(f"   \"{tok}\" -> {n}")
+
+    print("\nraw content of the fidelity rows for tokens note/see/appendix:")
+    for row in con.execute(
+        "SELECT id, content FROM messages WHERE content LIKE '%appendix%'").fetchall():
+        print("   ", row)
+    print("raw content rows containing src/main.rs:")
+    for row in con.execute(
+        "SELECT id, content FROM messages WHERE content LIKE '%src/main.rs%'").fetchall():
+        print("   ", row)
+    print("\nis that row reachable by its id through the FTS index?")
+    for row in con.execute(
+        """SELECT m.id, m.content FROM messages_fts JOIN messages m
+           ON m.id = messages_fts.rowid WHERE messages_fts MATCH 'note' """).fetchall():
+        print("   ", row)
+    a.close_store()
+con.close()

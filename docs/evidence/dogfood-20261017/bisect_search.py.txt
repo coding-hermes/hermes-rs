@@ -1,0 +1,78 @@
+#!/usr/bin/env python3
+"""Bisect the search-fidelity misses at the SQL level.
+
+For each missed string: (a) confirm the literal is in the store (LIKE),
+(b) ask the FTS5 index directly with the SANITIZED form the Rust path would
+    build, (c) ask the adapter the same query. Three answers localize the miss
+    to (i) the sanitizer's token merging, (ii) FTS index/rowid coverage, or
+    (iii) the adapter's read path.
+"""
+
+from __future__ import annotations
+
+import os
+import sqlite3
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from transcript_archive import Adapter  # noqa: E402
+
+SPECIAL = ['+', '{', '}', '(', ')', ':', '"', '^', '@', '/', '#', '&', '|', '~',
+           '[', ']', '<', '>', ',', ';', '!', '?', '$', '=', '\\', "'"]
+
+
+def rust_sanitize(query: str) -> str:
+    """Port of steps 1-2 (+5) of sanitize_fts5_query, enough for these cases."""
+    q = query
+    # step 2: remove specials (no space substitution)
+    q = "".join(c for c in q if c not in SPECIAL)
+    q = q.replace("%", " ")
+    # step 5: quote dotted/hyphenated/underscored words
+    out, word = "", ""
+
+    def flush(w):
+        if not w:
+            return ""
+        if any(c in w for c in ".-_") and any(c.isalnum() for c in w):
+            return f'"{w}"'
+        return w
+
+    for c in q:
+        if c.isspace():
+            out += flush(word)
+            word = ""
+            out += c
+        else:
+            word += c
+    out += flush(word)
+    return out.strip()
+
+
+CASES = ["src/main.rs", "cost=5.50", "note (see appendix)", "a,b;c",
+         "email a.b@example.com", "path C:\\Users\\kara", "slash/x", "q?x"]
+
+db = sys.argv[1]
+adapter_bin = sys.argv[2]
+con = sqlite3.connect(db)
+print(f"{'user query':<24} {'adapter':>7} {'SQL MATCH(sanitized)':>21} {'rows in fts':>11}  sanitized")
+for text in CASES:
+    sanitized = rust_sanitize(text)
+    with Adapter(adapter_bin) as a:
+        a.open(db, create=False)
+        adapter_hits = len(a.search(text, limit=50)["hits"])
+        a.close_store()
+    try:
+        sql_hits = con.execute(
+            "SELECT COUNT(*) FROM messages_fts WHERE messages_fts MATCH ?",
+            (sanitized,)).fetchone()[0]
+    except sqlite3.Error as e:
+        sql_hits = f"ERR {e}"
+    # how many rows does the index hold for this literal at all, per token?
+    toks = sanitized.replace('"', "").split()
+    tok_hits = {t: con.execute(
+        "SELECT COUNT(*) FROM messages_fts WHERE messages_fts MATCH ?", (f'"{t}"',)).fetchone()[0]
+        for t in toks} if toks else {}
+    like = con.execute("SELECT COUNT(*) FROM messages WHERE content LIKE '%' || ? || '%'",
+                       (text,)).fetchone()[0]
+    print(f"{text:<24} {adapter_hits:>7} {str(sql_hits):>21} {like:>11}  {sanitized!r}  per-token={tok_hits}")
+con.close()

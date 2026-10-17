@@ -1,0 +1,41 @@
+verbatim query              search  sqlite LIKE  verdict
+src/main.rs                      0            2  MISS
+cost=5.50                        0            2  MISS
+ratio 50%                        2            2  ok
+#hashtag                         2            2  ok
+note (see appendix)              0            2  MISS
+a,b;c                            0            2  MISS
+ok!                             50            2  ok
+$5                              50            2  ok
+path C:\Users\kara               0            2  MISS
+quote 'single'                   2            2  ok
+email a.b@example.com            0            2  MISS
+v1.2.3-rc.1                      2            2  ok
+under_score                      2            2  ok
+dash-term                        2            2  ok
+tilde~x                          0            2  MISS
+amp&x                            0            2  MISS
+pipe|x                           0            2  MISS
+star*                            2            2  ok
+caret^x                          0            2  MISS
+at@x                             0            2  MISS
+bracket[x]                       0            2  MISS
+brace{x}                         0            2  MISS
+colon:x                          0            2  MISS
+slash/x                          0            2  MISS
+plus+x                           0            2  MISS
+back\slash                       0            2  MISS
+lt<x                             0            2  MISS
+gt>x                             0            2  MISS
+semi;x                           0            2  MISS
+bang!x                           0            2  MISS
+q?x                              0            2  MISS
+
+-- bisect on 'src/main.rs': search sub-tokens
+   'src/main.rs' -> 0 hits
+   'src/main rs' -> 0 hits
+   'src main.rs' -> 2 hits
+   'src/main.rs' -> 0 hits
+   LIKE whole-string present: 2
+
+-- zero-result discriminator: 'zzz-no-such-text-zzz' -> 0 hits; 'zzz/no-such/text' -> 0 hits

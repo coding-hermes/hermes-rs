@@ -1,0 +1,18 @@
+typed by the user    adapter hits  raw MATCH (truth)  verdict
+note                            0                  0  ok
+notes                           0                  1  SILENT MISS
+nothing                         0                  1  SILENT MISS
+notable                         0                  1  SILENT MISS
+android                         0                  1  SILENT MISS
+order                           0                  1  SILENT MISS
+oracle                          0                  1  SILENT MISS
+command                         0                  1  SILENT MISS
+elephant                        1                  1  ok
+brand                           0                  1  SILENT MISS
+band                            0                  1  SILENT MISS
+command prompt                  0                  0  ok
+the command                     0                  1  SILENT MISS
+and                             0                  1  SILENT MISS
+or                              0                  0  ok
+not                             0                  0  ok
+scratch: /var/tmp/hermes-scratch/hrs-opbug-agqa1_l5

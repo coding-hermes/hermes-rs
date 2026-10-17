@@ -1,0 +1,41 @@
+#!/usr/bin/env python3
+"""Wrong-answer demo for the operator-strip bug.
+
+Two rows in one store:
+  A: content that contains the STRIPPED remainder ("bra")
+  B: content that contains what the user actually TYPED ("brand")
+Search "brand" and see which row comes back.
+"""
+from __future__ import annotations
+
+import os
+import sqlite3
+import sys
+import tempfile
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from transcript_archive import Adapter  # noqa: E402
+
+ad = sys.argv[1]
+scratch = tempfile.mkdtemp(prefix="hrs-wrong-")
+db = os.path.join(scratch, "state.db")
+with Adapter(ad) as a:
+    a.open(db, create=True)
+    a.ensure_session("s1", source="wrong", model="m")
+    a.append_message("s1", role="user", content="row A: bra measurements only")
+    a.append_message("s1", role="user", content="row B: brand measurements only")
+    a.call("checkpoint")
+    got = a.call("search", query="brand", limit=10)["hits"]
+    print("user typed 'brand' (row B contains it):")
+    for h in got:
+        print(f"   message_id={h['message_id']} snippet={h['snippet']!r}")
+    con = sqlite3.connect(db)
+    for mid, c in con.execute("SELECT id, content FROM messages ORDER BY id"):
+        print(f"   store row {mid}: {c}")
+    print("   FTS5 MATCH 'brand' rows:",
+          con.execute("SELECT rowid FROM messages_fts WHERE messages_fts MATCH 'brand'").fetchall())
+    print("   FTS5 MATCH 'bra' rows:",
+          con.execute("SELECT rowid FROM messages_fts WHERE messages_fts MATCH 'bra'").fetchall())
+    con.close()
+    a.close_store()
+print("scratch:", scratch)

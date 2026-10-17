@@ -1,0 +1,272 @@
+#!/usr/bin/env python3
+"""Append the 2026-10-17 dogfood findings (DF-HRS-104..110) to the board.
+
+Safety: snapshot first, assert every id is free, append, verify the id set
+diff is exactly the intended rows, and re-assert uniqueness. Never rewrites an
+existing row. Event appended to events.jsonl in the board's audit shape.
+"""
+from __future__ import annotations
+
+import json
+import shutil
+import subprocess
+import time
+
+BOARD = "/home/kara/hermes-rs/.coding-hermes/board/tasks.jsonl"
+EVENTS = "/home/kara/hermes-rs/.coding-hermes/board/events.jsonl"
+TS = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+TICK = "hermes-rs-dogfood-2026-10-17-14-23-04"
+
+rows = [
+    {
+        "id": "DF-HRS-104",
+        "title": "Dogfood: search silently truncates query words beginning/ending with and|or|not (sanitizer strips them as dangling operators)",
+        "status": "pending",
+        "priority": "P1",
+        "labels": ["dogfood", "search", "correctness"],
+        "detail": (
+            "`search` mangles the first/last token of a query via sanitize_fts5_query "
+            "step 4 (src/persistence/stock_sqlite.rs:1079-1092): the dangling-operator "
+            "stripper uses string starts_with/ends_with instead of whole-token matching, so "
+            "'notes'->'es', 'nothing'->'hing', 'notable'->'able', 'android'->'roid', "
+            "'order'->'der', 'oracle'->'acle', 'command'->'comm', 'brand'->'br', 'band'->'b', "
+            "'the command'->'the comm'. The store then returns hits=0 for text that IS present, "
+            "with no error, so a user cannot tell a mangled query from a genuine miss. "
+            "Hit while driving the published boundary as a real Python consumer over a "
+            "4,000-message archive: 9 of 16 ordinary words probe as SILENT MISS (adapter 0 vs "
+            "the same file's own messages_fts MATCH 1) — docs/evidence/dogfood-20261017/opbug.log. "
+            "Wrong-answer demo (wrong-answer.log): one row holds 'bra measurements only' and one "
+            "holds 'brand measurements only'; `search \"brand\"` returns 0 rows while "
+            "messages_fts MATCH 'brand' returns the brand row (rowid 2). Bisect at the SQL level "
+            "in bisect-search.log. "
+            "Fix direction: compare WHOLE tokens (split_whitespace + eq_ignore_ascii_case) before "
+            "dropping a dangling AND/OR/NOT, or drop step 4 entirely (FTS5 tolerates the "
+            "operators), and add one regression case per word in the probe table."
+        ),
+        "evidence": (
+            "docs/evidence/dogfood-20261017/{opbug.log,wrong-answer.log,bisect-search.log,"
+            "probe_opbug.py.txt,probe_wrong_answer.py.txt}; adapter built from HEAD 887a257 "
+            "(cargo build --release --bins)"
+        ),
+    },
+    {
+        "id": "DF-HRS-105",
+        "title": "Dogfood: search cannot find verbatim strings containing FTS5-special characters, and the mangled zero is indistinguishable from a real zero",
+        "status": "pending",
+        "priority": "P1",
+        "labels": ["dogfood", "search", "correctness"],
+        "detail": (
+            "sanitize step 2 deletes the FTS5-special set (src/persistence/stock_sqlite.rs:1049-1054) "
+            "with NO separator, so adjacent words merge into a token that exists nowhere "
+            "('src/main.rs'->'srcmain.rs', 'cost=5.50'->'cost5.50', 'slash/x'->'slashx', "
+            "'path C:\\\\Users\\\\kara'->'path CUserskara'), and step 5 (:1093-1120) then quotes the "
+            "merged token as a phrase. Result: 19 of 31 realistic verbatim strings a user can SEE "
+            "in their own transcript (file paths, cost= values, emails, punctuation) return 0 hits "
+            "although the stdlib sqlite3 LIKE finds the literal in the same row "
+            "(docs/evidence/dogfood-20261017/search-fidelity.log). The zero is silent: "
+            "'zzz-no-such-text-zzz' and 'zzz/no-such/text' also return 0, and the non-stale path has "
+            "no LIKE fallback (like_fallback at stock_sqlite.rs:1342 serves only the stale/corrupt "
+            "arms) and no diagnostic, so a user cannot distinguish 'no matches' from 'your query was "
+            "rewritten'. Fix direction: substitute a space for the specials instead of deleting them "
+            "(keep token boundaries), and when the sanitized query yields 0 hits while the RAW term "
+            "is present in canonical rows, answer from the LIKE arm or return a machine-visible "
+            "'query rewritten' signal."
+        ),
+        "evidence": (
+            "docs/evidence/dogfood-20261017/{search-fidelity.log,bisect-search.log,"
+            "fresh-store-control.log,probe_fidelity.py.txt}; adapter from HEAD 887a257"
+        ),
+    },
+    {
+        "id": "DF-HRS-106",
+        "title": "Dogfood: OpenReport.created_new_store is never assigned — always false, even immediately after creating the store",
+        "status": "pending",
+        "priority": "P1",
+        "labels": ["dogfood", "persistence", "contract"],
+        "detail": (
+            "The fresh-scaffold branch sets the LOCAL `created_new_store` "
+            "(src/persistence/stock_sqlite.rs:402) and uses it at :438, but nothing ever writes the "
+            "report field: OpenReport is built by ::default() at :319 and "
+            "`grep -rn '\\.created_new_store *=' src/` returns 0 hits (turso_backend.rs:283/313 "
+            "mirrors the same local). Observed through the published boundary on a path that did not "
+            "exist: open(create=True) answered {\"created_new_store\": false, "
+            "\"schema_version_before\": null, \"schema_version_after\": 31} — the store WAS created "
+            "while the flag says it was not (fresh-store-control.log). The Python client surfaces the "
+            "field as its public OpenReport.created_new_store (scripts/hrs003_client.py:41,108), so a "
+            "consumer that seeds only on a fresh store gets the wrong branch; no test asserts it "
+            "(no test references the field anywhere). Fix direction: assign "
+            "report.created_new_store = created_new_store before returning OpenStore in both "
+            "backends, and add a test that a create-open reports true and a reopen reports false."
+        ),
+        "evidence": (
+            "docs/evidence/dogfood-20261017/{fresh-store-control.log,census-diff.log}; source refs "
+            "stock_sqlite.rs:319,402,438 and api.rs:323"
+        ),
+    },
+    {
+        "id": "DF-HRS-107",
+        "title": "Dogfood: every fresh store opens DEGRADED — census mismatch names 2 indexes the scaffold never creates",
+        "status": "pending",
+        "priority": "P2",
+        "labels": ["dogfood", "persistence", "evidence-gap"],
+        "detail": (
+            "On a brand-new path, open(create=True) reports degraded [\"fresh-store census mismatch "
+            "after scaffold\"] (stock_sqlite.rs:447) — a health signal that fires on a healthy fresh "
+            "store, which is exactly the class of false alarm consumers are told to act on. Diffing "
+            "the store's sqlite_master against the embedded FRESH_STORE_CENSUS_JSON "
+            "(upstream_ddl.rs): table 23/23, view 2/2, trigger 11/11, index 24/26 — missing "
+            "idx_messages_platform_msg_id and idx_sessions_title_unique, whose names appear ONLY in "
+            "the census constant (no CREATE INDEX for them anywhere in the repo). So either the fresh "
+            "scaffold must install the two indexes or the census constant is stale; either way the "
+            "file produced by this slice is missing 2 indexes the census (and upstream's shape) "
+            "expects. Fix direction: install the two indexes in the fresh-scaffold DDL or regenerate "
+            "FRESH_STORE_CENSUS_JSON from the DDL, then assert a first open with degraded == [] in a "
+            "test. Evidence: docs/evidence/dogfood-20261017/census-diff.log (per-kind diff), "
+            "fresh-store-control.log (the open report)."
+        ),
+        "evidence": "docs/evidence/dogfood-20261017/{census-diff.log,fresh-store-control.log,census_diff2.py.txt}",
+    },
+    {
+        "id": "DF-HRS-108",
+        "title": "Dogfood: backup() refuses an existing destination with a bare Io error, while the upstream snapshot it mirrors pre-creates the destination",
+        "status": "pending",
+        "priority": "P2",
+        "labels": ["dogfood", "persistence", "docs"],
+        "detail": (
+            "`backup` to a destination that already exists fails closed with "
+            "Io(\"backup destination exists: <path>\") (stock_sqlite.rs:1473-1477). A repeated/nightly "
+            "backup loop to the same path therefore fails on the second run — hit for real while "
+            "archiving: the run that wrote state.db.backup made the NEXT run's backup call die with "
+            "Io[unknown] and abort the leg (docs/evidence/dogfood-20261017/backup-second-run.log). "
+            "specs/python-interop.md §4 documents `backup | dest | {\"ok\": true}` with no "
+            "precondition, and the upstream snapshot this slice mirrors PRE-CREATES the destination "
+            "(persistence-shim.md §2.10: `_safe_copy_db` destination pre-created 0600 with "
+            "O_NOFOLLOW), so a caller ported from upstream discipline is refused; F-8's separate "
+            "requirement is refusing a destination with a foreign HOLDER. Also the machine code is "
+            "the generic Io with no remediation text. Fix direction: truncate/overwrite the "
+            "destination the way the upstream snapshot does, or return InvalidInput naming the "
+            "precondition and document the rotation recipe in §4."
+        ),
+        "evidence": "docs/evidence/dogfood-20261017/backup-second-run.log; stock_sqlite.rs:1469-1477; persistence-shim.md §2.10",
+    },
+    {
+        "id": "DF-HRS-109",
+        "title": "Dogfood: §6.1 append_messages_batch has no implementation and record_model_usage is unreachable over the wire (§3.1 claims the whole §6.1 set) — bulk import pays 402x",
+        "status": "pending",
+        "priority": "P2",
+        "labels": ["dogfood", "persistence", "perf", "contract"],
+        "detail": (
+            "specs/python-interop.md §3.1 states the store exposes \"exactly the §6.1 operation set "
+            "(ensure_session, append_message, get_messages, search_messages, end_session, "
+            "record_model_usage)\"; persistence-shim.md §6.1 additionally lists "
+            "append_messages_batch ('one transaction for the whole batch'). Reality at HEAD 887a257: "
+            "`grep -rn append_messages_batch src/` = 1 hit, a doc comment; BatchAppendReport "
+            "(api.rs:426) has no producer and no consumer (only the mod.rs re-export); WriteTxn "
+            "record_model_usage is declared (api.rs:483) and implemented stock_sqlite.rs:822, but the "
+            "adapter dispatch (session_adapter.rs:133-340) exposes only "
+            "hello/ping/open/ensure_session/append_message/get_messages/get_session/end_session/"
+            "search/checkpoint/backup/close/shutdown — so a Python consumer can neither batch a "
+            "transcript nor record model usage. Cost of the missing batch path, measured as the "
+            "consumer: 2,000 messages through the boundary = 19.48s (103 msg/s, one durable commit "
+            "per message) vs 0.048s (41,270 msg/s) for the same bytes in ONE transaction via stdlib "
+            "sqlite3 = 402x (bulk-ab.log); the 4,000-message archive leg took 29.5s (136 msg/s). Per "
+            "single append this is 7-10ms — imperceptible — so the finding is the MISSING BATCH "
+            "surface, not a slow append. Fix direction: implement append_messages_batch in the slice "
+            "and expose append_messages_batch + record_model_usage on the wire, or correct §3.1 to "
+            "name the exposed subset explicitly."
+        ),
+        "evidence": "docs/evidence/dogfood-20261017/{bulk-ab.log,transcript_archive.py.txt}; grep refs api.rs:426/483, stock_sqlite.rs:822, session_adapter.rs:133",
+    },
+    {
+        "id": "DF-HRS-110",
+        "title": "Dogfood/install: the README's documented smoke verb `cargo test` fails on a clean machine — 5 tests require a system sqlite3 CLI (control host green at the same commit)",
+        "status": "pending",
+        "priority": "P1",
+        "labels": ["dogfood", "install", "docs"],
+        "detail": (
+            "Fresh-install leg on ephemeral bunker agent hrs-df-1017 (server bunker-mvp, 2026-10-17, "
+            "HEAD 887a257, bare Debian user, no sudo): clone of the documented public origin 1s; "
+            "rustup installed exactly as README points (https://rustup.rs) 16s -> cargo 1.99.1; "
+            "documented `cargo build` rc=0 in 25s; then the README's own smoke verb `cargo test` "
+            "returned rc=101: \"test result: FAILED. 17 passed; 5 failed\" in "
+            "tests/hrs010_session_store.rs — f2_rust_write_then_sqlite3_reads_the_same_file (:259), "
+            "slice_record_model_usage_upserts_and_falls_back_to_session_route (:653), "
+            "f9_generation_counter_increments_and_never_decrements (:579), "
+            "migration_newer_schema_version_is_refused_not_downgraded (:681), "
+            "stale_fts_marker_serves_canonical_rows_not_partial_search (:982) — every one panicking "
+            "with Os { code: 2, kind: NotFound } because the test shells out to a `sqlite3` CLI the "
+            "fresh box does not have, with no preflight and no recorded skip. Control: the SAME "
+            "commit on the control host (sqlite3 3.53.4 present) is 29/29 green across all 9 test "
+            "binaries, so the class is machine-dependent — but the documented clean-checkout path "
+            "still ends red for a fresh user, and README Development says only 'From a clean "
+            "checkout, run: cargo build; cargo test' (no prerequisite named). The headline feature "
+            "DOES work on that box: the HRS-003 e2e proof passed all five markers with the adapter "
+            "built there (bunker-e2e.log: ROUNDTRIP_OK / SQLITE3_REOPEN_OK / "
+            "SQLITE_SCHEMA_VERSION=31 / ERROR_STRUCTURED / LIFECYCLE_CLEAN). Fix direction: preflight "
+            "the CLI in those 5 tests and record a capability SKIP with the reason (repo doctrine: "
+            "recorded skips, never silent), or do the read-back through the bundled SQLite via Rust "
+            "instead of the CLI, and name any remaining prerequisite in README Development. Same env "
+            "class DF-HRS-103 adjudicated as harness (chaos-resource); this run shows it also breaks "
+            "the project's own documented install smoke. DF-HRS-101 ('no install path to prove') is "
+            "superseded by this run: an install path now exists and was exercised end-to-end."
+        ),
+        "evidence": (
+            "docs/evidence/dogfood-20261017/{bunker-install-leg.out,bunker-test.log,bunker-e2e.log,"
+            "control-host-cargo-test.log,bunker_install.sh.txt}; install_seconds: clone 1 + rustup 16 "
+            "+ build 25 + test 25; footprint 1.9G (.rustup 1.5G, .cargo 85M, target 284M)"
+        ),
+    },
+]
+
+# ── snapshot + free-id assertions ───────────────────────────────────────────
+shutil.copy2(BOARD, "/tmp/hrs-board-tasks.pre-dogfood.jsonl")
+shutil.copy2(EVENTS, "/tmp/hrs-board-events.pre-dogfood.jsonl")
+existing = open(BOARD).read()
+for r in rows:
+    marker = '"id":"%s"' % r["id"]
+    marker2 = '"id": "%s"' % r["id"]
+    assert marker not in existing and marker2 not in existing, f"id already present: {r['id']}"
+before_ids = [json.loads(l)["id"] for l in existing.splitlines() if l.strip()]
+assert len(before_ids) == len(set(before_ids)), "board already has duplicate ids"
+
+# ── append rows ─────────────────────────────────────────────────────────────
+with open(BOARD, "a") as fh:
+    for r in rows:
+        row = {
+            "id": r["id"], "title": r["title"], "status": r["status"],
+            "priority": r["priority"], "labels": r["labels"], "complexity": 3,
+            "created_at": TS, "updated_at": TS, "attempts": 0,
+            "blocks": [], "depends_on": [], "capability_tags": [],
+            "worker_status": "pending", "completed_at": None,
+            "commit_hash": None, "foreman_note": None, "reasoning": None,
+            "detail": r["detail"], "evidence": r["evidence"],
+        }
+        fh.write(json.dumps(row, sort_keys=True) + "\n")
+
+# ── verify ──────────────────────────────────────────────────────────────────
+after_ids = [json.loads(l)["id"] for l in open(BOARD).read().splitlines() if l.strip()]
+added = [i for i in after_ids if i not in before_ids]
+assert added == [r["id"] for r in rows], f"unexpected id diff: {added}"
+assert len(after_ids) == len(set(after_ids)), "duplicate ids after append"
+print("appended:", added)
+print("rows:", len(before_ids), "->", len(after_ids))
+
+# ── event ───────────────────────────────────────────────────────────────────
+ev = {
+    "tick": TICK,
+    "type": "dogfood",
+    "task_id": None,
+    "ts": TS,
+    "detail": (
+        "Dogfood run 2 (real-use angle: Python consumer over the HRS-003 boundary at scale, "
+        "4000-message archive) filed DF-HRS-104..110 and proved the fresh-install leg on "
+        "ephemeral bunker agent hrs-df-1017 (bunker-mvp, HEAD 887a257): clone 1s, rustup 16s, "
+        "cargo build 25s rc=0, cargo test rc=101 with 5 hrs010 tests failing on a missing system "
+        "sqlite3 CLI (control host 29/29 green at the same commit), HRS-003 e2e proof all five "
+        "markers OK on the fresh box. Evidence: docs/evidence/dogfood-20261017/, report "
+        "docs/dogfood/2026-10-17-run2-integration.md, log .coding-hermes/dogfood-log.md."
+    ),
+}
+with open(EVENTS, "a") as fh:
+    fh.write(json.dumps(ev, sort_keys=True) + "\n")
+print("event appended")

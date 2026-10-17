@@ -1,0 +1,71 @@
+[14:44:11] == 0. fresh box inventory ==
+bunker-hrs-df-1017
+bunker-mvp
+PRETTY_NAME="Ubuntu 24.04.4 LTS"
+NAME="Ubuntu"
+VERSION_ID="24.04"
+8
+               total        used        free      shared  buff/cache   available
+Mem:           15613        2176        1041          65       12802       13437
+/dev/sda1       150G   59G   86G  41% /
+[14:44:11] toolchains present before install:
+   git      /usr/bin/git
+   go       /usr/bin/go
+   make     /usr/bin/make
+   gcc      /usr/bin/gcc
+   cc       /usr/bin/cc
+   sqlite3  MISSING
+   python3  /usr/bin/python3
+   curl     /usr/bin/curl
+   rustc    MISSING
+   cargo    MISSING
+[14:44:11] == 1. clone the documented origin (no credentials) ==
+[14:44:12] CLONE_RC=0 secs=1
+Cloning into '/home/bunker-hrs-df-1017/hermes-rs'...
+HEAD 887a2575a3277f46af46b9a7138480d0066967bb 2026-10-16T11:30:53-05:00
+[14:44:12] rust-toolchain.toml:
+[toolchain]
+# Follow the stable release channel; CI installs the same channel and components.
+channel = "stable"
+components = ["rustfmt", "clippy"]
+profile = "minimal"
+[14:44:12] == 2. install rustup exactly as the README points (https://rustup.rs) ==
+[14:44:12] RUSTUP_DOWNLOAD_RC=0
+[14:44:28] RUSTUP_INSTALL_RC=0 secs=16
+cargo:rerun-if-env-changed=CFLAGS_x86_64_unknown_linux_gnu
+CFLAGS_x86_64_unknown_linux_gnu = None
+cargo:rerun-if-env-changed=CFLAGS_x86_64-unknown-linux-gnu
+CFLAGS_x86_64-unknown-linux-gnu = None
+[14:44:28]    cargo: cargo 1.99.1 (5f94df478 2026-08-27) | rustc: rustc 1.99.1 (58cf8f9c3 2026-10-13)
+[14:44:28] == 3. documented build verb: cargo build ==
+[14:44:47] CARGO_BUILD_RC=0 secs=19
+   Compiling rusqlite v0.40.2
+   Compiling regex v1.13.1
+   Compiling hermes-rs v0.1.0 (/home/bunker-hrs-df-1017/hermes-rs)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 18.29s
+[14:44:47] == 4. documented smoke verb: cargo test ==
+[14:44:53] CARGO_TEST_RC=101 secs=6
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.75s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: FAILED. 17 passed; 5 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.55s
+error: test failed, to rerun pass `--test hrs010_session_store`
+[14:44:53] == 5. headline feature on the SAME fresh box (HRS-003 boundary) ==
+[14:44:53] ADAPTER_BUILD_RC=0
+-rwxr-xr-x 2 bunker-hrs-df-1017 bunker-hrs-df-1017 14560224 Oct 17 14:44 /home/bunker-hrs-df-1017/hermes-rs/target/debug/hermes-rs-session-adapter
+[14:44:53] python3 present: Python 3.12.3
+[14:44:53] E2E_PROOF_RC=0 secs=0
+ROUNDTRIP_OK create/append/read/reopen verified across two adapter processes
+SQLITE3_REOPEN_OK stdlib sqlite3 read the acknowledged rows; integrity=ok
+SQLITE_SCHEMA_VERSION=31
+ERROR_STRUCTURED bad call -> AdapterError(SessionRowMissing, cause=session_row_missing)
+LIFECYCLE_CLEAN exit-0 shutdown, no orphaned adapter, no WAL/lock leftovers
+[14:44:53] == 6. artefact + toolchain sizes ==
+85M	/home/bunker-hrs-df-1017/.cargo
+1.5G	/home/bunker-hrs-df-1017/.rustup
+284M	/home/bunker-hrs-df-1017/hermes-rs/target
+[14:44:54] DONE

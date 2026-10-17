@@ -1,0 +1,6 @@
+user typed 'brand' (row B contains it):
+   store row 1: row A: bra measurements only
+   store row 2: row B: brand measurements only
+   FTS5 MATCH 'brand' rows: [(2,)]
+   FTS5 MATCH 'bra' rows: [(1,)]
+scratch: /var/tmp/hermes-scratch/hrs-wrong-r4tl2te6

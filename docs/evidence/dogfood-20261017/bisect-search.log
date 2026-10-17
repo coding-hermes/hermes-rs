@@ -1,0 +1,9 @@
+user query               adapter  SQL MATCH(sanitized) rows in fts  sanitized
+src/main.rs                    0                     0           2  '"srcmain.rs"'  per-token={'srcmain.rs': 0}
+cost=5.50                      0                     0           2  '"cost5.50"'  per-token={'cost5.50': 0}
+note (see appendix)            0                     2           2  'note see appendix'  per-token={'note': 2, 'see': 2, 'appendix': 2}
+a,b;c                          0                     0           2  'abc'  per-token={'abc': 0}
+email a.b@example.com          0                     0           2  'email "a.bexample.com"'  per-token={'email': 2, 'a.bexample.com': 0}
+path C:\Users\kara             0                     0           2  'path CUserskara'  per-token={'path': 2, 'CUserskara': 0}
+slash/x                        0                     0           2  'slashx'  per-token={'slashx': 0}
+q?x                            0                     0           2  'qx'  per-token={'qx': 0}

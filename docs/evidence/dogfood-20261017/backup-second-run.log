@@ -1,0 +1,4 @@
+first  backup -> {"ok": true}
+   dest exists: True
+second backup -> SpecError(error='Io', cause='unknown', detail='io error: backup destination exists: /var/tmp/hermes-scratch/hrs-backup-hp3w02py/state.db.backup')
+scratch: /var/tmp/hermes-scratch/hrs-backup-hp3w02py

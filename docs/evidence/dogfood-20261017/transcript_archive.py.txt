@@ -1,0 +1,376 @@
+#!/usr/bin/env python3
+"""Dogfood consumer for hermes-rs: a transcript archiver + search tool.
+
+This is a REAL consumer written OUTSIDE the hermes-rs repo, implemented from
+the published wire contract in `specs/python-interop.md` §4 alone (no import of
+the repo's own client, no internal helpers). It uses only the CPython standard
+library, which is the whole point of the boundary.
+
+Use case: a Python program that archives Hermes-style session transcripts into
+a state.db-shaped store and lets a user search them afterwards.
+
+Legs (--mode):
+  archive  create N sessions x M messages, end them, checkpoint + backup
+  search   run the queries a real user would type against the archive
+  edges    probe the boundary with the inputs real users produce
+  bench    timed warm/cold numbers for the headline operations
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sqlite3
+import subprocess
+import sys
+import time
+
+
+# ── client, written from specs/python-interop.md §4 ────────────────────────
+class SpecError(Exception):
+    def __init__(self, error, cause, detail):
+        super().__init__(f"{error}[{cause}]: {detail}")
+        self.error, self.cause, self.detail = error, cause, detail
+
+
+class Adapter:
+    """One adapter process; one open store per process (§4)."""
+
+    def __init__(self, binary):
+        self.binary = binary
+        self.proc = subprocess.Popen(
+            [binary],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            bufsize=1,
+        )
+        self.n = 0
+
+    def call(self, method, **params):
+        self.n += 1
+        frame = {"id": self.n, "method": method}
+        if params:
+            frame["params"] = params
+        # §4 lists ProcessDead as a client-side code: detect a dead adapter
+        # before writing into a closed pipe.
+        if self.proc.poll() is not None:
+            err = self.proc.stderr.read() if self.proc.stderr else ""
+            raise SpecError("ProcessDead", "unknown",
+                            f"rc={self.proc.returncode} stderr={err.strip()}")
+        try:
+            self.proc.stdin.write(json.dumps(frame) + "\n")
+        except BrokenPipeError:
+            err = self.proc.stderr.read() if self.proc.stderr else ""
+            raise SpecError("ProcessDead", "unknown",
+                            f"broken pipe rc={self.proc.returncode} stderr={err.strip()}")
+        self.proc.stdin.flush()
+        line = self.proc.stdout.readline()
+        if not line:
+            err = self.proc.stderr.read() if self.proc.stderr else ""
+            raise SpecError("ProcessDead", "unknown",
+                            f"rc={self.proc.returncode} stderr={err.strip()}")
+        reply = json.loads(line)
+        if "error" in reply:
+            e = reply["error"]
+            raise SpecError(e.get("error", "?"), e.get("cause", "?"),
+                            e.get("detail", ""))
+        return reply["result"]
+
+    def open(self, path, create=True, read_only=False):
+        return self.call("open", path=path, create=create, read_only=read_only)
+
+    def ensure_session(self, sid, source=None, model=None):
+        p = {"session_id": sid}
+        if source is not None:
+            p["source"] = source
+        if model is not None:
+            p["model"] = model
+        return self.call("ensure_session", **p)
+
+    def append_message(self, sid, role=None, content=None, **kw):
+        p = {"session_id": sid}
+        if role is not None:
+            p["role"] = role
+        if content is not None:
+            p["content"] = content
+        p.update(kw)
+        return self.call("append_message", **p)
+
+    def get_messages(self, sid, limit=None):
+        p = {"session_id": sid}
+        if limit is not None:
+            p["limit"] = limit
+        return self.call("get_messages", **p)
+
+    def search(self, query, limit=None):
+        p = {"query": query}
+        if limit is not None:
+            p["limit"] = limit
+        return self.call("search", **p)
+
+    def close_store(self):
+        return self.call("close")
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        try:
+            self.call("shutdown")
+        except Exception:
+            pass
+        try:
+            self.proc.wait(timeout=10)
+        except Exception:
+            self.proc.kill()
+        return False
+
+
+# ── realistic workload ─────────────────────────────────────────────────────
+TOPICS = [
+    "sqlite wal checkpoint tuning on the fleet box",
+    "cargo release profile build time regression",
+    "session store schema version 31 migration",
+    "tool call argument escaping in the adapter",
+    "Fsync durability under power loss",
+]
+
+
+def transcript(sess_i, msgs):
+    """Hermes-shaped turns: user prompt, assistant reply, tool call, tool result."""
+    out = []
+    for k in range(msgs):
+        topic = TOPICS[(sess_i + k) % len(TOPICS)]
+        if k % 4 == 0:
+            out.append(("user", f"session {sess_i} turn {k}: what changed about {topic}?"))
+        elif k % 4 == 1:
+            out.append(("assistant",
+                        f"session {sess_i} turn {k}: measured {topic}; numbers attached."))
+        elif k % 4 == 2:
+            out.append(("assistant",
+                        f"session {sess_i} turn {k}: calling tool for {topic}"))
+        else:
+            out.append(("tool", f"session {sess_i} turn {k}: result for {topic} ok"))
+    return out
+
+
+def archive(db, adapter_bin, sessions, msgs, quiet=False):
+    t0 = time.perf_counter()
+    with Adapter(adapter_bin) as a:
+        rep = a.open(db, create=not os.path.exists(db))
+        t_open = time.perf_counter() - t0
+        per_session = []
+        for s in range(sessions):
+            sid = f"20261017_090000_{s:06d}"
+            s0 = time.perf_counter()
+            a.ensure_session(sid, source="dogfood-consumer", model="glm-5.3-flash")
+            for role, content in transcript(s, msgs):
+                a.append_message(sid, role=role, content=content)
+            a.call("end_session", session_id=sid, end_reason="done")
+            per_session.append(time.perf_counter() - s0)
+        a.call("checkpoint")
+        a.call("backup", dest=db + ".backup")
+        a.close_store()
+    total = time.perf_counter() - t0
+    per_session.sort()
+    if not quiet:
+        print(f"ARCHIVE_OK sessions={sessions} messages={sessions*msgs} "
+              f"total={total:.3f}s open={t_open:.4f}s "
+              f"per_session_median={per_session[len(per_session)//2]:.4f}s "
+              f"per_session_p95={per_session[int(len(per_session)*0.95)]:.4f}s "
+              f"throughput_msgs_per_s={sessions*msgs/total:.0f}")
+    return total
+
+
+def search_leg(db, adapter_bin):
+    queries = [
+        "sqlite",
+        "wal checkpoint",
+        "regression",
+        "fsync",
+        "session 7 turn 3",
+        "nonexistent-term-zzz",
+        "cargo release profile",
+        "tool call escaping",
+        "durability",
+        "migration",
+    ]
+    t0 = time.perf_counter()
+    with Adapter(adapter_bin) as a:
+        a.open(db, create=False)
+        spawn_open = time.perf_counter() - t0
+        lat = []
+        for q in queries:
+            q0 = time.perf_counter()
+            r = a.search(q, limit=10)
+            dt = time.perf_counter() - q0
+            lat.append((q, dt, len(r["hits"]), r["hits"][:1]))
+        a.close_store()
+    lat_sorted = sorted(d for _, d, _, _ in lat)
+    for q, dt, n, first in lat:
+        rank = f"{first[0]['rank']:.4f}" if first else "-"
+        print(f"SEARCH q={q!r} hits={n} {dt*1000:.2f}ms first_rank={rank}")
+    print(f"SEARCH_LATENCY spawn+open={spawn_open:.4f}s "
+          f"median={lat_sorted[len(lat_sorted)//2]*1000:.2f}ms "
+          f"max={lat_sorted[-1]*1000:.2f}ms")
+
+
+def edge_leg(db, adapter_bin):
+    """Inputs a real user produces that the repo's own proof never sends."""
+    results = []
+
+    def probe(name, fn):
+        try:
+            out = fn()
+            results.append((name, "OK", out))
+        except SpecError as e:
+            results.append((name, f"ERR {e.error}/{e.cause}", e.detail))
+        except Exception as e:  # noqa: BLE001
+            results.append((name, f"PY {type(e).__name__}", str(e)[:120]))
+
+    def fresh_sid(adapter, tag):
+        sid = f"20261017_100000_{tag}"
+        adapter.ensure_session(sid, source="edge", model="m")
+        adapter.append_message(sid, role="user", content="needle in the transcript")
+        return sid
+
+    with Adapter(adapter_bin) as a:
+        a.open(db, create=False)
+        sid = fresh_sid(a, "edge1")
+
+        probe("empty_query", lambda: len(a.search("")["hits"]))
+        probe("quoted_phrase", lambda: len(a.search('"needle in the transcript"')["hits"]))
+        probe("multiword_and", lambda: len(a.search("needle transcript")["hits"]))
+        probe("hyphen_term", lambda: len(a.search("state.db-shaped")["hits"]))
+        probe("underscore_term", lambda: len(a.search("end_session")["hits"]))
+        probe("star_wildcard", lambda: len(a.search("trans*")["hits"]))
+        probe("NEAR_operator", lambda: len(a.search("NEAR(needle transcript)")["hits"]))
+        probe("unbalanced_quote", lambda: len(a.search('"needle')["hits"]))
+        probe("dash_negation", lambda: len(a.search("needle -transcript")["hits"]))
+        probe("unicode_term", lambda: len(a.search("transcripción")["hits"]))
+        probe("long_query_2000c", lambda: len(a.search("needle " * 300)["hits"]))
+        probe("limit_zero", lambda: len(a.search("needle", limit=0)["hits"]))
+        probe("limit_huge", lambda: len(a.search("needle", limit=10**9)["hits"]))
+        probe("get_messages_limit_1", lambda: len(a.get_messages(sid, limit=1)["messages"]))
+        probe("get_messages_limit_0", lambda: len(a.get_messages(sid, limit=0)["messages"]))
+        probe("get_session_unknown", lambda: a.call("get_session", session_id="nope"))
+        probe("append_empty_content",
+              lambda: a.append_message(sid, role="user", content="")["message_id"])
+        probe("append_unknown_role",
+              lambda: a.append_message(sid, role="robot", content="x")["message_id"])
+        probe("ensure_duplicate",
+              lambda: a.ensure_session(sid, source="again", model="m2"))
+        probe("end_twice", lambda: a.call("end_session", session_id=sid))
+        # NOTE: the 'unknown method' probe is documented to kill the process
+        # (§4: exits 6), so it runs LAST and the close is best-effort.
+        probe("unknown_method_survives", lambda: a.call("frobnicate"))
+
+    # fail-closed / lifecycle probes need their own processes
+    def run_sep(name, body):
+        try:
+            with Adapter(adapter_bin) as b:
+                out = body(b)
+                results.append((name, "OK", out))
+        except SpecError as e:
+            results.append((name, f"ERR {e.error}/{e.cause}", e.detail))
+        except Exception as e:  # noqa: BLE001
+            results.append((name, f"PY {type(e).__name__}", str(e)[:120]))
+
+    run_sep("open_missing_no_create", lambda b: b.open(os.path.join(
+        os.path.dirname(db), "does-not-exist.db"), create=False))
+    run_sep("write_on_readonly", lambda b: (
+        b.open(db, create=False, read_only=True),
+        b.append_message("20261017_100000_edge1", role="user", content="x")))
+    run_sep("write_before_open", lambda b: b.append_message("s", role="user", content="x"))
+    run_sep("bad_params_type", lambda b: b.open(db, create="yes"))
+
+    for name, status, detail in results:
+        print(f"EDGE {name}: {status} :: {str(detail)[:160]}")
+    return results
+
+
+def bench_leg(db, adapter_bin, out_dir):
+    """Headline ops: cold first-run vs warm, at a user-visible scale."""
+    # cold: brand-new store, brand-new process
+    cold_db = os.path.join(out_dir, "cold.db")
+    if os.path.exists(cold_db):
+        os.unlink(cold_db)
+    t0 = time.perf_counter()
+    archive(cold_db, adapter_bin, 1, 20, quiet=True)
+    cold_one_session = time.perf_counter() - t0
+
+    # adapter spawn only
+    t0 = time.perf_counter()
+    with Adapter(adapter_bin) as a:
+        t_hello = time.perf_counter() - t0
+        a.call("hello")
+        t_hello_done = time.perf_counter() - t0
+
+    # warm: existing store, one more session
+    t0 = time.perf_counter()
+    archive(db, adapter_bin, 1, 20, quiet=True)
+    warm_one_session = time.perf_counter() - t0
+
+    # single append against the warm store, measured in-process
+    appends = []
+    search_ms = []
+    with Adapter(adapter_bin) as a:
+        t0 = time.perf_counter()
+        a.open(db, create=False)
+        open_ms = (time.perf_counter() - t0) * 1000
+        a.ensure_session("20261017_110000_bench", source="bench", model="m")
+        for i in range(30):
+            t0 = time.perf_counter()
+            a.append_message("20261017_110000_bench", role="user", content=f"bench {i}")
+            appends.append((time.perf_counter() - t0) * 1000)
+        for i in range(30):
+            t0 = time.perf_counter()
+            a.search("sqlite")
+            search_ms.append((time.perf_counter() - t0) * 1000)
+        a.close_store()
+
+    def stat(xs):
+        xs = sorted(xs)
+        return f"median={xs[len(xs)//2]:.3f}ms p95={xs[int(len(xs)*0.95)]:.3f}ms min={xs[0]:.3f} max={xs[-1]:.3f}"
+
+    print(f"BENCH adapter_spawn_to_hello={t_hello*1000:.1f}ms hello_reply={t_hello_done*1000:.1f}ms")
+    print(f"BENCH cold_first_run_1_session_20_msgs={cold_one_session:.3f}s")
+    print(f"BENCH warm_1_session_20_msgs={warm_one_session:.3f}s")
+    print(f"BENCH open_existing_store={open_ms:.1f}ms")
+    print(f"BENCH append_message_30x {stat(appends)}")
+    print(f"BENCH search_30x {stat(search_ms)}")
+    # sqlite readback cost (independent stack)
+    t0 = time.perf_counter()
+    con = sqlite3.connect(db)
+    n = con.execute("SELECT COUNT(*) FROM messages").fetchone()[0]
+    s = con.execute("SELECT COUNT(*) FROM messages WHERE content LIKE '%sqlite%'").fetchone()[0]
+    con.close()
+    print(f"BENCH sqlite3_full_scan count={n} like_hits={s} in {time.perf_counter()-t0:.3f}s")
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--mode", required=True,
+                    choices=["archive", "search", "edges", "bench"])
+    ap.add_argument("--db", default=os.environ.get("HRS_DB", "/tmp/hrs-dogfood/state.db"))
+    ap.add_argument("--adapter", required=True)
+    ap.add_argument("--sessions", type=int, default=200)
+    ap.add_argument("--msgs", type=int, default=20)
+    args = ap.parse_args()
+    os.makedirs(os.path.dirname(args.db), exist_ok=True)
+    if args.mode == "archive":
+        archive(args.db, args.adapter, args.sessions, args.msgs)
+    elif args.mode == "search":
+        search_leg(args.db, args.adapter)
+    elif args.mode == "edges":
+        edge_leg(args.db, args.adapter)
+    elif args.mode == "bench":
+        bench_leg(args.db, args.adapter, os.path.dirname(args.db))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

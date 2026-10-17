@@ -1,0 +1,7 @@
+census constant parsed ok; kinds: {'index': 26, 'table': 23, 'trigger': 11, 'view': 2}
+created_new_store= False degraded= ['fresh-store census mismatch after scaffold'] schema_before= None schema_after= 31
+table    exp=23  act=23  missing=[] extra=[]
+index    exp=26  act=24  missing=['idx_messages_platform_msg_id', 'idx_sessions_title_unique'] extra=[]
+view     exp=2   act=2   missing=[] extra=[]
+trigger  exp=11  act=11  missing=[] extra=[]
+db: /var/tmp/hermes-scratch/hrs-census-z7o3um7m/state.db

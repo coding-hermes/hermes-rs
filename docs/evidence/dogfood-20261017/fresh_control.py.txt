@@ -1,0 +1,54 @@
+#!/usr/bin/env python3
+"""Fresh-store control: does the parens multi-token miss reproduce on a brand
+new store with one message? Also dumps state_meta staleness keys and the raw
+adapter reply, so the mechanism is observable rather than inferred."""
+from __future__ import annotations
+
+import json
+import os
+import sqlite3
+import sys
+import tempfile
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from transcript_archive import Adapter  # noqa: E402
+
+ad = sys.argv[1]
+scratch = tempfile.mkdtemp(prefix="hrs-fresh-")
+db = os.path.join(scratch, "state.db")
+
+with Adapter(ad) as a:
+    rep = a.open(db, create=True)
+    print("open report:", json.dumps(rep["report"]))
+    print("capabilities:", json.dumps(rep["capabilities"]))
+    a.ensure_session("s1", source="fresh", model="m")
+    a.append_message("s1", role="user", content="deploy note (see appendix) for src/main.rs now")
+    a.call("checkpoint")
+    for q in ["appendix", "see appendix", "note see appendix", "note (see appendix)",
+              "src/main.rs", "main.rs", "src", 'src main rs', "deploy note"]:
+        raw = a.call("search", query=q, limit=10)
+        print(f"  search {q!r:<26} -> {len(raw['hits'])} hits  raw={json.dumps(raw)[:150]}")
+    a.close_store()
+
+con = sqlite3.connect(db)
+print("\nstate_meta rows:", con.execute("SELECT key, value FROM state_meta").fetchall())
+print("\nmessages_fts DDL:", con.execute(
+    "SELECT sql FROM sqlite_master WHERE name LIKE 'messages_fts%'").fetchall())
+print("\nsqlite_master fts-ish names:", [r[0] for r in con.execute(
+    "SELECT name FROM sqlite_master WHERE name LIKE '%fts%' OR name LIKE '%trigram%'")])
+print("\nraw LIKE for the parens query:",
+      con.execute("SELECT COUNT(*) FROM messages WHERE content LIKE '%note see appendix%'").fetchone()[0])
+print("raw MATCH for 'note see appendix':",
+      con.execute("SELECT COUNT(*) FROM messages_fts WHERE messages_fts MATCH 'note see appendix'").fetchone()[0])
+print("\nfull-rust-SQL for 'note see appendix':")
+sql = """SELECT m.id, snippet(messages_fts,-1,'>>>','<<<','...',40), rank FROM messages_fts
+         JOIN messages m ON m.id = messages_fts.rowid JOIN sessions s ON s.id = m.session_id
+         WHERE messages_fts MATCH ?1 AND (m.active = 1 OR m.compacted = 1)
+         AND COALESCE(m.display_kind,'') <> 'hidden' ORDER BY rank LIMIT 10 OFFSET 0"""
+print("   ", con.execute(sql, ("note see appendix",)).fetchall())
+print("full-rust-SQL for 'src main rs':")
+print("   ", con.execute(sql, ("src main rs",)).fetchall())
+print("plain MATCH 'src main rs':",
+      con.execute("SELECT COUNT(*) FROM messages_fts WHERE messages_fts MATCH 'src main rs'").fetchone()[0])
+con.close()
+print("scratch:", scratch)

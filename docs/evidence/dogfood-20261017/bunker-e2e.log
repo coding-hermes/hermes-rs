@@ -1,0 +1,5 @@
+ROUNDTRIP_OK create/append/read/reopen verified across two adapter processes
+SQLITE3_REOPEN_OK stdlib sqlite3 read the acknowledged rows; integrity=ok
+SQLITE_SCHEMA_VERSION=31
+ERROR_STRUCTURED bad call -> AdapterError(SessionRowMissing, cause=session_row_missing)
+LIFECYCLE_CLEAN exit-0 shutdown, no orphaned adapter, no WAL/lock leftovers

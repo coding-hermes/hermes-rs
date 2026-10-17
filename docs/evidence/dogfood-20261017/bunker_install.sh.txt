@@ -1,0 +1,68 @@
+#!/bin/bash
+# Fresh-install leg for hermes-rs on an ephemeral bunker agent.
+# Runs the README's documented path verbatim: rustup (rustup.rs) + cargo build + cargo test,
+# then the headline feature (the HRS-003 Python interop proof) on the same fresh box.
+set -u
+export HOME="${HOME:-/home/$(id -un)}"
+cd "$HOME" || exit 1
+say() { echo "[$(date -u +%H:%M:%S)] $*"; }
+
+say "== 0. fresh box inventory =="
+id -un; hostname; (cat /etc/os-release 2>/dev/null | head -3); nproc
+free -m 2>/dev/null | head -2; df -h "$HOME" | tail -1
+say "toolchains present before install:"
+for t in git go make gcc cc sqlite3 python3 curl rustc cargo; do
+  printf '   %-8s %s\n' "$t" "$(command -v "$t" || echo MISSING)"
+done
+
+say "== 1. clone the documented origin (no credentials) =="
+t0=$(date +%s)
+git clone https://github.com/coding-hermes/hermes-rs.git "$HOME/hermes-rs" >"$HOME/clone.log" 2>&1
+rc=$?
+say "CLONE_RC=$rc secs=$(( $(date +%s) - t0 ))"
+tail -2 "$HOME/clone.log"
+cd "$HOME/hermes-rs" || exit 1
+git log -1 --format='HEAD %H %cI'
+say "rust-toolchain.toml:"; cat rust-toolchain.toml
+
+say "== 2. install rustup exactly as the README points (https://rustup.rs) =="
+t0=$(date +%s)
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o "$HOME/rustup-init.sh"
+say "RUSTUP_DOWNLOAD_RC=$?"
+sh "$HOME/rustup-init.sh" -y --no-modify-path >"$HOME/rustup.log" 2>&1
+say "RUSTUP_INSTALL_RC=$? secs=$(( $(date +%s) - t0 ))"
+tail -4 "$HOME/rustup.log"
+export PATH="$HOME/.cargo/bin:$PATH"
+say "   cargo: $(cargo --version 2>&1) | rustc: $(rustc --version 2>&1)"
+
+say "== 3. documented build verb: cargo build =="
+t0=$(date +%s)
+cargo build >"$HOME/build.log" 2>&1
+brc=$?
+say "CARGO_BUILD_RC=$brc secs=$(( $(date +%s) - t0 ))"
+tail -4 "$HOME/build.log"
+
+say "== 4. documented smoke verb: cargo test =="
+t0=$(date +%s)
+cargo test >"$HOME/test.log" 2>&1
+trc=$?
+say "CARGO_TEST_RC=$trc secs=$(( $(date +%s) - t0 ))"
+grep -E 'test result|error\[|error:' "$HOME/test.log" | tail -12
+
+say "== 5. headline feature on the SAME fresh box (HRS-003 boundary) =="
+cargo build --bin hermes-rs-session-adapter >"$HOME/adapter-build.log" 2>&1
+say "ADAPTER_BUILD_RC=$?"
+AD="$HOME/hermes-rs/target/debug/hermes-rs-session-adapter"
+ls -la "$AD" 2>&1 | tail -1
+if command -v python3 >/dev/null; then
+  say "python3 present: $(python3 -V 2>&1)"
+  t0=$(date +%s)
+  python3 scripts/hrs003_e2e_proof.py --adapter "$AD" >"$HOME/e2e.log" 2>&1
+  say "E2E_PROOF_RC=$? secs=$(( $(date +%s) - t0 ))"
+  cat "$HOME/e2e.log"
+else
+  say "E2E_SKIPPED: python3 MISSING on the fresh box (documented proof needs a Python 3 interpreter)"
+fi
+say "== 6. artefact + toolchain sizes =="
+du -sh "$HOME/.cargo" "$HOME/.rustup" "$HOME/hermes-rs/target" 2>/dev/null | tail -3
+say "DONE"

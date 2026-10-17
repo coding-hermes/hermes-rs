@@ -1,0 +1,206 @@
+#!/usr/bin/env python3
+"""Discriminating probes: (1) does `search` find text a user can SEE in the
+store, (2) param type/default handling at the boundary, (3) bulk-import A/B.
+
+Leg 1 — search fidelity matrix. Writes ONE message per test string through the
+        adapter, then searches each string VERBATIM, and independently confirms
+        the literal is present with stdlib sqlite3 LIKE. A string present in the
+        store but unfindable by `search` is a user-visible miss.
+Leg 2 — parameter contract. Wrong-typed / missing params: does the boundary
+        fail closed, or silently substitute a default?
+Leg 3 — bulk import A/B: the same 2,000 messages through the adapter
+        (one durable commit per message) versus the same bytes written by
+        stdlib sqlite3 in a single transaction.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import sqlite3
+import subprocess
+import sys
+import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from transcript_archive import Adapter, SpecError  # noqa: E402
+
+CASES = [
+    "src/main.rs",
+    "cost=5.50",
+    "ratio 50%",
+    "#hashtag",
+    "note (see appendix)",
+    "a,b;c",
+    "ok!",
+    "$5",
+    "path C:\\Users\\kara",
+    "quote 'single'",
+    "email a.b@example.com",
+    "v1.2.3-rc.1",
+    "under_score",
+    "dash-term",
+    "tilde~x",
+    "amp&x",
+    "pipe|x",
+    "star*",
+    "caret^x",
+    "at@x",
+    "bracket[x]",
+    "brace{x}",
+    "colon:x",
+    "slash/x",
+    "plus+x",
+    "back\\slash",
+    "lt<x",
+    "gt>x",
+    "semi;x",
+    "bang!x",
+    "q?x",
+]
+
+
+def leg_search(db, adapter_bin):
+    sid = "20261017_130000_fidelity"
+    with Adapter(adapter_bin) as a:
+        a.open(db, create=not os.path.exists(db))
+        a.ensure_session(sid, source="fidelity", model="m")
+        for i, text in enumerate(CASES):
+            a.append_message(sid, role="user", content=f"row {i:02d}: {text} end")
+        a.call("checkpoint")
+
+        print(f"{'verbatim query':<26} {'search':>7} {'sqlite LIKE':>12}  verdict")
+        misses = []
+        for text in CASES:
+            hits = len(a.search(text, limit=50)["hits"])
+            con = sqlite3.connect(db)
+            like = con.execute(
+                "SELECT COUNT(*) FROM messages WHERE content LIKE '%' || ? || '%'",
+                (text,),
+            ).fetchone()[0]
+            con.close()
+            verdict = "ok" if (hits > 0 or like == 0) else "MISS"
+            if verdict == "MISS":
+                misses.append(text)
+            print(f"{text:<26} {hits:>7} {like:>12}  {verdict}")
+        # discriminating follow-ups on the first miss
+        if misses:
+            t = misses[0]
+            first_word = t.split()[0].strip(".")
+            print(f"\n-- bisect on {t!r}: search sub-tokens")
+            for sub in (first_word, t.replace(".", " "), t.replace("/", " "), t):
+                print(f"   {sub!r} -> {len(a.search(sub, limit=50)['hits'])} hits")
+            print(f"   LIKE whole-string present: "
+                  f"{sqlite3.connect(db).execute('SELECT COUNT(*) FROM messages WHERE content LIKE ?', ('%'+t+'%',)).fetchone()[0]}")
+        # is a mangled-query zero distinguishable from a true zero?
+        zero_q = "zzz-no-such-text-zzz"
+        zero_special = "zzz/no-such/text"
+        print(f"\n-- zero-result discriminator: {zero_q!r} -> "
+              f"{len(a.search(zero_q)['hits'])} hits; "
+              f"{zero_special!r} -> {len(a.search(zero_special)['hits'])} hits")
+        a.close_store()
+    return misses
+
+
+def leg_params(db, adapter_bin):
+    checks = []
+
+    def sep(name, body):
+        try:
+            with Adapter(adapter_bin) as b:
+                out = body(b)
+            checks.append((name, "OK", str(out)[:120]))
+        except SpecError as e:
+            checks.append((name, f"ERR {e.error}/{e.cause}", e.detail[:120]))
+
+    fresh = os.path.join(os.path.dirname(db), "param-fresh.db")
+    if os.path.exists(fresh):
+        os.unlink(fresh)
+    sep("open_fresh_omitting_create",
+        lambda b: b.call("open", path=fresh)["report"]["created_new_store"])
+    sep("open_fresh_create_string_yes",
+        lambda b: b.call("open", path=fresh, create="yes")["report"]["created_new_store"])
+    sep("open_fresh_create_int_1",
+        lambda b: b.call("open", path=fresh, create=1)["report"]["created_new_store"])
+    sep("open_no_path", lambda b: b.call("open", create=True))
+    sep("open_path_int", lambda b: b.call("open", path=42, create=True))
+    sep("append_no_session_id", lambda b: (
+        b.open(db, create=False), b.call("append_message", role="user", content="x")))
+    sep("search_no_query", lambda b: (b.open(db, create=False), b.call("search")))
+    sep("search_limit_string", lambda b: (
+        b.open(db, create=False),
+        len(b.call("search", query="sqlite", limit="3")["hits"])))
+    sep("get_messages_limit_string", lambda b: (
+        b.open(db, create=False),
+        len(b.call("get_messages", session_id="20261017_100000_edge1",
+                   limit="1")["messages"])))
+    sep("append_content_number", lambda b: (
+        b.open(db, create=False),
+        b.call("append_message", session_id="20261017_100000_edge1",
+               role="user", content=12345)))
+    sep("double_open_same_process", lambda b: (
+        b.open(db, create=False), b.open(db, create=False)))
+    sep("params_not_object", lambda b: b.call("ping", params="x"))
+    for name, status, detail in checks:
+        print(f"PARAM {name}: {status} :: {detail}")
+    return checks
+
+
+def leg_bulk(db, adapter_bin, n=2000):
+    """A/B: adapter per-message commits vs one stdlib transaction."""
+    db_a = os.path.join(os.path.dirname(db), "bulk-adapter.db")
+    db_b = os.path.join(os.path.dirname(db), "bulk-sqlite.db")
+    for p in (db_a, db_b):
+        if os.path.exists(p):
+            os.unlink(p)
+    body = [("user", f"bulk message {i} about sqlite and wal checkpointing") for i in range(n)]
+
+    t0 = time.perf_counter()
+    with Adapter(adapter_bin) as a:
+        a.open(db_a, create=True)
+        a.ensure_session("bulk", source="bulk", model="m")
+        for role, content in body:
+            a.append_message("bulk", role=role, content=content)
+        a.call("checkpoint")
+        a.close_store()
+    t_adapter = time.perf_counter() - t0
+
+    t0 = time.perf_counter()
+    con = sqlite3.connect(db_b)
+    con.execute("PRAGMA journal_mode=WAL")
+    con.execute("CREATE TABLE messages (id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                "session_id TEXT, role TEXT, content TEXT)")
+    con.execute("BEGIN IMMEDIATE")
+    con.executemany("INSERT INTO messages (session_id, role, content) VALUES (?,?,?)",
+                    [("bulk", r, c) for r, c in body])
+    con.commit()
+    con.close()
+    t_sqlite = time.perf_counter() - t0
+
+    print(f"BULK n={n} adapter_per_message_commits={t_adapter:.3f}s "
+          f"({n/t_adapter:.0f} msg/s) one_transaction_sqlite={t_sqlite:.3f}s "
+          f"({n/t_sqlite:.0f} msg/s) ratio={t_adapter/max(t_sqlite,1e-9):.1f}x")
+    # is the wall clock I/O wait rather than CPU?
+    for p in (db_a, db_b):
+        print(f"   size({os.path.basename(p)})={os.path.getsize(p)} bytes")
+    return t_adapter, t_sqlite
+
+
+def main():
+    ap = __import__("argparse").ArgumentParser()
+    ap.add_argument("--adapter", required=True)
+    ap.add_argument("--db", default="/tmp/hrs-dogfood/state.db")
+    ap.add_argument("--leg", default="all",
+                    choices=["all", "search", "params", "bulk"])
+    args = ap.parse_args()
+    if args.leg in ("all", "search"):
+        leg_search(args.db, args.adapter)
+    if args.leg in ("all", "params"):
+        leg_params(args.db, args.adapter)
+    if args.leg in ("all", "bulk"):
+        leg_bulk(args.db, args.adapter)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

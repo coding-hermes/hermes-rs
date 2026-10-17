@@ -1,0 +1,12 @@
+PARAM open_fresh_omitting_create: ERR Io/unknown :: io error: sqlite error (14): unable to open database file: /tmp/hrs-dogfood/param-fresh.db
+PARAM open_fresh_create_string_yes: ERR Io/unknown :: io error: sqlite error (14): unable to open database file: /tmp/hrs-dogfood/param-fresh.db
+PARAM open_fresh_create_int_1: ERR Io/unknown :: io error: sqlite error (14): unable to open database file: /tmp/hrs-dogfood/param-fresh.db
+PARAM open_no_path: ERR InvalidInput/unknown :: params.path (string) is required
+PARAM open_path_int: ERR InvalidInput/unknown :: params.path (string) is required
+PARAM append_no_session_id: ERR InvalidInput/unknown :: params.session_id (string) is required
+PARAM search_no_query: ERR InvalidInput/unknown :: params.query (string) is required
+PARAM search_limit_string: OK :: ({'capabilities': {'bulk_parameter_limit': 999, 'checkpoint_passive_only': True, 'file_format_standard_sqlite': True, 'f
+PARAM get_messages_limit_string: OK :: ({'capabilities': {'bulk_parameter_limit': 999, 'checkpoint_passive_only': True, 'file_format_standard_sqlite': True, 'f
+PARAM append_content_number: OK :: ({'capabilities': {'bulk_parameter_limit': 999, 'checkpoint_passive_only': True, 'file_format_standard_sqlite': True, 'f
+PARAM double_open_same_process: ERR AlreadyOpen/unknown :: this adapter serves one store per process; use close/shutdown first
+PARAM params_not_object: OK :: {'pong': True}

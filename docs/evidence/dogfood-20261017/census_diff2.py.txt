@@ -1,0 +1,43 @@
+#!/usr/bin/env python3
+"""Diff a fresh store's sqlite_master against the embedded census constant."""
+import json
+import os
+import re
+import sqlite3
+import sys
+import tempfile
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from transcript_archive import Adapter  # noqa: E402
+
+ad = sys.argv[1]
+src = open("/home/kara/hermes-rs/src/persistence/upstream_ddl.rs").read()
+m = re.search(r'FRESH_STORE_CENSUS_JSON:\s*&str\s*=\s*r?#?"(.*?)"#?\s*;', src, re.S)
+if not m:
+    i = src.find("FRESH_STORE_CENSUS_JSON")
+    print("const not matched; context:", src[max(0, i - 200):i + 300])
+    sys.exit(1)
+expected = json.loads(m.group(1))
+print("census constant parsed ok; kinds:", {k: len(v) for k, v in expected.items()})
+
+scratch = tempfile.mkdtemp(prefix="hrs-census-")
+db = os.path.join(scratch, "state.db")
+with Adapter(ad) as a:
+    rep = a.open(db, create=True)
+    print("created_new_store=", rep["report"]["created_new_store"],
+          "degraded=", rep["report"]["degraded"],
+          "schema_before=", rep["report"]["schema_version_before"],
+          "schema_after=", rep["report"]["schema_version_after"])
+    a.close_store()
+
+con = sqlite3.connect(db)
+for typ in ("table", "index", "view", "trigger"):
+    actual = sorted(r[0] for r in con.execute(
+        "SELECT name FROM sqlite_master WHERE type = ? AND name NOT LIKE 'sqlite_%'",
+        (typ,)))
+    exp = sorted(expected.get(typ, []))
+    print(f"{typ:<8} exp={len(exp):<3} act={len(actual):<3} "
+          f"missing={[n for n in exp if n not in actual]} "
+          f"extra={[n for n in actual if n not in exp]}")
+con.close()
+print("db:", db)
