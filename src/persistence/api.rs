@@ -485,6 +485,13 @@ pub trait WriteTxn {
         session_id: &str,
         delta: &ModelUsageDelta,
     ) -> Result<(), StoreError>;
+    /// Batch append: one transaction for the whole batch (§6.1).
+    /// Returns the first row id and the count appended.
+    fn append_messages_batch(
+        &mut self,
+        session_id: &str,
+        msgs: &[AppendMessage],
+    ) -> Result<BatchAppendReport, StoreError>;
 }
 
 /// The caller-facing store trait (§3.3 sketch). `T` is carried through

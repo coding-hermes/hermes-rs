@@ -1023,6 +1023,96 @@ impl<'a> WriteTxn for SqliteWriteTxn<'a> {
             .map_err(|_| StoreError::InvalidInput("model usage upsert failed".into()))?;
         Ok(())
     }
+
+    fn append_messages_batch(
+        &mut self,
+        session_id: &str,
+        msgs: &[AppendMessage],
+    ) -> Result<super::api::BatchAppendReport, StoreError> {
+        if msgs.is_empty() {
+            return Ok(super::api::BatchAppendReport {
+                first_id: 0,
+                appended: 0,
+            });
+        }
+        // Guard: refuse appends into a compression-closed session (same as append_message).
+        let ended: Option<(Option<f64>, Option<String>)> = self
+            .conn
+            .query_row(
+                "SELECT ended_at, end_reason FROM sessions WHERE id = ?1",
+                [session_id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .map(Some)
+            .or_else(|e| match e {
+                rusqlite::Error::QueryReturnedNoRows => Ok(None),
+                other => Err(other),
+            })
+            .map_err(|_| StoreError::SessionRowMissing)?;
+        let Some((ended_at, end_reason)) = ended else {
+            return Err(StoreError::SessionRowMissing);
+        };
+        if ended_at.is_some() && end_reason.as_deref() == Some("compression") {
+            return Err(StoreError::CompressionClosed);
+        }
+
+        let mut first_id: i64 = 0;
+        let mut appended: usize = 0;
+        for msg in msgs {
+            let timestamp = msg.timestamp.unwrap_or_else(now_epoch);
+            let uid = match &msg.message_uid {
+                Some(u) => u.clone(),
+                None => mint_message_uid(self.conn)
+                    .map_err(|e| StoreError::InvalidInput(e.to_string()))?,
+            };
+            self.conn
+                .execute(
+                    INSERT_MESSAGE_SQL,
+                    rusqlite::params![
+                        session_id,
+                        msg.role,
+                        msg.content,
+                        msg.tool_call_id,
+                        msg.tool_calls,
+                        msg.tool_name,
+                        timestamp,
+                        msg.token_count,
+                        uid,
+                    ],
+                )
+                .map_err(|e| match classify(&e) {
+                    PersistenceError::Io(io) => StoreError::InvalidInput(io.to_string()),
+                    _ => StoreError::SessionRowMissing,
+                })?;
+            let row_id = self.conn.last_insert_rowid();
+            if first_id == 0 {
+                first_id = row_id;
+            }
+            appended += 1;
+            // Counter bump per message (same logic as append_message).
+            let calls = tool_calls_count(&msg.tool_calls);
+            if calls > 0 {
+                self.conn
+                    .execute(
+                        "UPDATE sessions SET message_count = message_count + 1,
+                           tool_call_count = tool_call_count + ?1 WHERE id = ?2",
+                        rusqlite::params![calls, session_id],
+                    )
+                    .map_err(|_| StoreError::InvalidInput("counter bump failed".into()))?;
+            } else {
+                self.conn
+                    .execute(
+                        "UPDATE sessions SET message_count = message_count + 1 WHERE id = ?1",
+                        [session_id],
+                    )
+                    .map_err(|_| StoreError::InvalidInput("counter bump failed".into()))?;
+            }
+        }
+        Ok(super::api::BatchAppendReport {
+            first_id,
+            appended,
+        })
+    }
 }
 
 fn sanitize_fts5_query(query: &str) -> String {
