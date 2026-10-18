@@ -460,6 +460,8 @@ impl StockSqliteBackend {
             report.schema_version_after = Some(v);
         }
 
+        report.created_new_store = created_new_store;
+
         // ── Journal resolution ──────────────────────────────────────────
         let journal = if opts.read_only {
             JournalCapability::RollbackOnly

@@ -368,6 +368,7 @@ impl TursoBackend {
             report.schema_version_after = Some(SCHEMA_VERSION_KNOWN);
         }
 
+        report.created_new_store = created_new_store;
         report.degraded = degraded;
 
         // ── Capabilities: measured at 0.8.3, never aspirational ─────────
