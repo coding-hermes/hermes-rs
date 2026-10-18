@@ -64,7 +64,7 @@ transport vectors (`prototypes/test_adapter/last_paired_run_ok.json`).
 | `fts_storage_version` marker absent on the fixture | the marker is stamped by the reference only during a v23+ ensure on FRESH stores; the fixture file was produced by the reference's normal open path. Rust stamps it only on fresh scaffolds (same rule). | OpenReport semantics in code comment |
 | `advisory_generation_guard = false` | upstream's OFD-lock WAL-generation lockguard surface is not ported in this slice; the capability reports the gap rather than claiming it. | Capabilities struct |
 | Display-identity minting (Python `repr`-tuple SHA256) | the durable `display_identity` bytes are computed by the reference from Python tuple reprs; the slice does not mint them (Python recompute paths heal display identities). Documented at the INSERT site. | `stock_sqlite.rs` comment above `INSERT_MESSAGE_SQL` |
-| Batch append (`append_messages_batch`) as a distinct txn shape | a batch is expressible as multiple `append_message` calls inside ONE `write()` closure (same txn by construction, §3.3); a dedicated batching API is deferred. | §6.1 mapping note below |
+|Batch append (`append_messages_batch`) | landed in DF-HRS-109; batch is available as a dedicated transaction API. | §6.1 mapping note below |
 
 ## 4. Fixture parity (Python-produced → Rust → sqlite3)
 

@@ -139,13 +139,9 @@ two.
 
 `specs/python-interop.md` §3.1 says the boundary exposes "exactly the §6.1
 operation set … `record_model_usage`", and §6.1 lists
-`append_messages_batch` ("one transaction for the whole batch"). Neither is on
-the wire: `BatchAppendReport` has no producer, and the adapter has no
-`record_model_usage` method (`DF-HRS-109`). The measured cost of the missing
-batch path: 2,000 messages = **19.5 s (103 msg/s)** through the boundary vs
-**0.048 s (41,270 msg/s)** for the same bytes in one transaction — **402×**.
-Per message that is 7–10 ms, which nobody feels; importing an archive is where
-it lands.
+`append_messages_batch` ("one transaction for the whole batch"). Both are now
+on the wire as of DF-HRS-109. The client exposes these methods without claiming
+drop-in compatibility.
 
 ### 3.5 A fresh user's documented install is red
 

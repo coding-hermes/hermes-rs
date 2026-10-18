@@ -17,6 +17,15 @@ source reference; where a behavior is inferred rather than read, it is marked
 
 ## 1. Purpose and scope
 
+### DF-HRS-109 batch append implementation note
+
+`append_messages_batch` is a correctness-first API: message rows are inserted
+within the enclosing write transaction and session counters are updated once
+after the batch. The stock-SQLite path therefore avoids per-row counter UPDATEs;
+the Turso compatibility implementation currently delegates each message through
+its existing append logic. Throughput parity with `append_message` remains the
+baseline until measured evidence supports further backend-specific work.
+
 This document specifies, as design (no code):
 
 1. An **inventory** of the pinned upstream state store's persistence surface —

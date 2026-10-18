@@ -110,7 +110,8 @@ HRS-010 landed the session store behind the HRS-002 engine-neutral shim:
 `StockSqliteBackend::open(OpenOptions) -> (StockSqliteStore, OpenStore)`,
 with `SessionStore::write/read` transactions exposing exactly the §6.1
 operation set (`ensure_session`, `append_message`, `get_messages`,
-`search_messages`, `end_session`, `record_model_usage`) plus
+`search_messages`, `end_session`, `record_model_usage`,
+`append_messages_batch`) plus
 `checkpoint_passive` / `backup` / `close` / `capabilities` /
 `open_report` (`src/persistence/api.rs`, `src/persistence/stock_sqlite.rs`).
 The store is a Rust struct with `&mut self` semantics on close and a

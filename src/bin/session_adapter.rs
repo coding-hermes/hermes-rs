@@ -318,15 +318,30 @@ fn dispatch(
             let msgs: Vec<AppendMessage> = messages
                 .iter()
                 .map(|m| AppendMessage {
-                    role: m.get("role").and_then(|r| r.as_str()).unwrap_or("user").to_string(),
+                    role: m
+                        .get("role")
+                        .and_then(|r| r.as_str())
+                        .unwrap_or("user")
+                        .to_string(),
                     content: m.get("content").and_then(|c| c.as_str()).map(String::from),
-                    tool_calls: m.get("tool_calls").and_then(|c| c.as_str()).map(String::from),
-                    tool_call_id: m.get("tool_call_id").and_then(|c| c.as_str()).map(String::from),
-                    tool_name: m.get("tool_name").and_then(|c| c.as_str()).map(String::from),
+                    tool_calls: m
+                        .get("tool_calls")
+                        .and_then(|c| c.as_str())
+                        .map(String::from),
+                    tool_call_id: m
+                        .get("tool_call_id")
+                        .and_then(|c| c.as_str())
+                        .map(String::from),
+                    tool_name: m
+                        .get("tool_name")
+                        .and_then(|c| c.as_str())
+                        .map(String::from),
                     timestamp: m.get("timestamp").and_then(|t| t.as_f64()),
                     token_count: m.get("token_count").and_then(|t| t.as_i64()),
-                    message_uid: m.get("message_uid").and_then(|u| u.as_str()).map(String::from),
-                    ..AppendMessage::default()
+                    message_uid: m
+                        .get("message_uid")
+                        .and_then(|u| u.as_str())
+                        .map(String::from),
                 })
                 .collect();
             call(store, |s| {
@@ -341,20 +356,67 @@ fn dispatch(
                 return missing_param("session_id");
             };
             let delta = hermes_rs::persistence::ModelUsageDelta {
-                model: params.get("model").and_then(|m| m.as_str()).unwrap_or("").to_string(),
-                billing_provider: params.get("billing_provider").and_then(|p| p.as_str()).unwrap_or("").to_string(),
-                billing_base_url: params.get("billing_base_url").and_then(|u| u.as_str()).unwrap_or("").to_string(),
-                billing_mode: params.get("billing_mode").and_then(|m| m.as_str()).unwrap_or("").to_string(),
-                task: params.get("task").and_then(|t| t.as_str()).unwrap_or("").to_string(),
-                api_call_count: params.get("api_call_count").and_then(|c| c.as_i64()).unwrap_or(0),
-                input_tokens: params.get("input_tokens").and_then(|t| t.as_i64()).unwrap_or(0),
-                output_tokens: params.get("output_tokens").and_then(|t| t.as_i64()).unwrap_or(0),
-                cache_read_tokens: params.get("cache_read_tokens").and_then(|t| t.as_i64()).unwrap_or(0),
-                cache_write_tokens: params.get("cache_write_tokens").and_then(|t| t.as_i64()).unwrap_or(0),
-                reasoning_tokens: params.get("reasoning_tokens").and_then(|t| t.as_i64()).unwrap_or(0),
-                estimated_cost_usd: params.get("estimated_cost_usd").and_then(|c| c.as_f64()).unwrap_or(0.0),
-                cost_status: params.get("cost_status").and_then(|s| s.as_str()).map(String::from),
-                cost_source: params.get("cost_source").and_then(|s| s.as_str()).map(String::from),
+                model: params
+                    .get("model")
+                    .and_then(|m| m.as_str())
+                    .unwrap_or("")
+                    .to_string(),
+                billing_provider: params
+                    .get("billing_provider")
+                    .and_then(|p| p.as_str())
+                    .unwrap_or("")
+                    .to_string(),
+                billing_base_url: params
+                    .get("billing_base_url")
+                    .and_then(|u| u.as_str())
+                    .unwrap_or("")
+                    .to_string(),
+                billing_mode: params
+                    .get("billing_mode")
+                    .and_then(|m| m.as_str())
+                    .unwrap_or("")
+                    .to_string(),
+                task: params
+                    .get("task")
+                    .and_then(|t| t.as_str())
+                    .unwrap_or("")
+                    .to_string(),
+                api_call_count: params
+                    .get("api_call_count")
+                    .and_then(|c| c.as_i64())
+                    .unwrap_or(0),
+                input_tokens: params
+                    .get("input_tokens")
+                    .and_then(|t| t.as_i64())
+                    .unwrap_or(0),
+                output_tokens: params
+                    .get("output_tokens")
+                    .and_then(|t| t.as_i64())
+                    .unwrap_or(0),
+                cache_read_tokens: params
+                    .get("cache_read_tokens")
+                    .and_then(|t| t.as_i64())
+                    .unwrap_or(0),
+                cache_write_tokens: params
+                    .get("cache_write_tokens")
+                    .and_then(|t| t.as_i64())
+                    .unwrap_or(0),
+                reasoning_tokens: params
+                    .get("reasoning_tokens")
+                    .and_then(|t| t.as_i64())
+                    .unwrap_or(0),
+                estimated_cost_usd: params
+                    .get("estimated_cost_usd")
+                    .and_then(|c| c.as_f64())
+                    .unwrap_or(0.0),
+                cost_status: params
+                    .get("cost_status")
+                    .and_then(|s| s.as_str())
+                    .map(String::from),
+                cost_source: params
+                    .get("cost_source")
+                    .and_then(|s| s.as_str())
+                    .map(String::from),
             };
             call(store, |s| {
                 s.write(Patience::WRITE, &mut |txn| {

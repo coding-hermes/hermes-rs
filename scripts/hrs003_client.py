@@ -153,6 +153,16 @@ class SessionAdapter:
         params.update(extra)
         return self._call("append_message", params)
 
+    def append_messages_batch(self, session_id: str, messages: list[dict]) -> dict:
+        """Append a sequence of messages in one adapter write operation."""
+        return self._call(
+            "append_messages_batch", {"session_id": session_id, "messages": messages}
+        )
+
+    def record_model_usage(self, session_id: str, **usage) -> dict:
+        """Record a model-usage delta through the adapter wire method."""
+        return self._call("record_model_usage", {"session_id": session_id, **usage})
+
     def get_messages(self, session_id: str, limit: int | None = None) -> dict:
         return self._call("get_messages", {"session_id": session_id, "limit": limit})
 

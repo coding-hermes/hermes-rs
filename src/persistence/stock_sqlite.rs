@@ -1057,7 +1057,7 @@ impl<'a> WriteTxn for SqliteWriteTxn<'a> {
         }
 
         let mut first_id: i64 = 0;
-        let mut appended: usize = 0;
+        let mut tool_call_total: i64 = 0;
         for msg in msgs {
             let timestamp = msg.timestamp.unwrap_or_else(now_epoch);
             let uid = match &msg.message_uid {
@@ -1088,29 +1088,18 @@ impl<'a> WriteTxn for SqliteWriteTxn<'a> {
             if first_id == 0 {
                 first_id = row_id;
             }
-            appended += 1;
-            // Counter bump per message (same logic as append_message).
-            let calls = tool_calls_count(&msg.tool_calls);
-            if calls > 0 {
-                self.conn
-                    .execute(
-                        "UPDATE sessions SET message_count = message_count + 1,
-                           tool_call_count = tool_call_count + ?1 WHERE id = ?2",
-                        rusqlite::params![calls, session_id],
-                    )
-                    .map_err(|_| StoreError::InvalidInput("counter bump failed".into()))?;
-            } else {
-                self.conn
-                    .execute(
-                        "UPDATE sessions SET message_count = message_count + 1 WHERE id = ?1",
-                        [session_id],
-                    )
-                    .map_err(|_| StoreError::InvalidInput("counter bump failed".into()))?;
-            }
+            tool_call_total += tool_calls_count(&msg.tool_calls);
         }
+        self.conn
+            .execute(
+                "UPDATE sessions SET message_count = message_count + ?1,
+             tool_call_count = tool_call_count + ?2 WHERE id = ?3",
+                rusqlite::params![msgs.len() as i64, tool_call_total, session_id],
+            )
+            .map_err(|_| StoreError::InvalidInput("counter bump failed".into()))?;
         Ok(super::api::BatchAppendReport {
             first_id,
-            appended,
+            appended: msgs.len(),
         })
     }
 }

@@ -642,6 +642,30 @@ impl<'a> WriteTxn for TursoWriteTxn<'a> {
         Ok(row_id)
     }
 
+    fn append_messages_batch(
+        &mut self,
+        session_id: &str,
+        msgs: &[AppendMessage],
+    ) -> Result<super::api::BatchAppendReport, StoreError> {
+        if msgs.is_empty() {
+            return Ok(super::api::BatchAppendReport {
+                first_id: 0,
+                appended: 0,
+            });
+        }
+        let mut first_id = 0;
+        for msg in msgs {
+            let id = self.append_message(session_id, msg)?;
+            if first_id == 0 {
+                first_id = id;
+            }
+        }
+        Ok(super::api::BatchAppendReport {
+            first_id,
+            appended: msgs.len(),
+        })
+    }
+
     fn end_session(
         &mut self,
         session_id: &str,
