@@ -526,12 +526,6 @@ CREATE INDEX IF NOT EXISTS idx_sessions_tool_names
 -- a small candidate set before compression-chain and preview hydration.
 CREATE INDEX IF NOT EXISTS idx_sessions_effective_activity
     ON sessions(COALESCE(last_activity_at, started_at) DESC, started_at DESC);
--- Upstream hermes_state_schema.py:135 creates this UNIQUE partial index on sessions(title).
-CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_title_unique
-    ON sessions(title) WHERE title IS NOT NULL;
--- Upstream hermes_state_schema.py:959 creates this partial index on messages(session_id, platform_message_id).
-CREATE INDEX IF NOT EXISTS idx_messages_platform_msg_id
-    ON messages(session_id, platform_message_id) WHERE platform_message_id IS NOT NULL;
 "#;
 
 /// (table, column, declared default or None) for additive reconciliation.
