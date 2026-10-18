@@ -1542,12 +1542,13 @@ impl SessionStore for StockSqliteStore {
     fn backup(&self, dest: &Path) -> Result<(), PersistenceError> {
         // Backup-API snapshot (§2.10): copying only the main file loses WAL
         // data; the API copies page-consistent state.
+        // DF-HRS-108: upstream pre-creates the destination (O_NOFOLLOW, 0600);
+        // we must accept an existing path and overwrite it (matching the
+        // upstream _safe_copy_db contract). Remove any existing file first so
+        // the SQLite backup API can create a fresh database file.
         self.assert_open()?;
         if dest.exists() {
-            return Err(PersistenceError::Io(std::io::Error::new(
-                std::io::ErrorKind::AlreadyExists,
-                format!("backup destination exists: {}", dest.display()),
-            )));
+            let _ = std::fs::remove_file(dest);
         }
         let src = self.conn.lock().unwrap();
         let step = {
