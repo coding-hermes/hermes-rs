@@ -9,6 +9,8 @@ on:
       - rust-toolchain*
       - '**/Cargo.toml'
       - '**/*.rs'
+      - 'scripts/hrs003_e2e_proof.py'
+      - 'scripts/hrs003_client.py'
   pull_request:
     paths:
       - Cargo.toml
@@ -16,6 +18,8 @@ on:
       - rust-toolchain*
       - '**/Cargo.toml'
       - '**/*.rs'
+      - 'scripts/hrs003_e2e_proof.py'
+      - 'scripts/hrs003_client.py'
 
 permissions:
   contents: read
@@ -35,3 +39,5 @@ jobs:
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
       - name: Tests
         run: cargo test --workspace --all-features
+      - name: Batch + model-usage wire proof (DF-HRS-112)
+        run: python3 scripts/hrs003_e2e_proof.py --mode batch-wire

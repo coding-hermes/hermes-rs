@@ -92,6 +92,13 @@ fn hrs003_python_roundtrip_and_sqlite_readback() {
         "SQLITE_SCHEMA_VERSION=31",
         "ERROR_STRUCTURED",
         "LIFECYCLE_CLEAN",
+        // DF-HRS-112: the batch + model-usage wire legs now run as part of
+        // the default proof; their markers are asserted like the rest so a
+        // dispatch-arm regression in src/bin/session_adapter.rs fails the
+        // battery instead of only the standalone run.
+        "BATCH_WIRE_OK",
+        "MODEL_USAGE_WIRE_OK",
+        "HRS112_WIRE_CLEAN",
     ] {
         assert!(
             stdout.contains(marker),

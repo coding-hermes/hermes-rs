@@ -138,7 +138,8 @@ test 25 s) on a shared 16-core box at load ~25.
 | `fresh-store-control.log` | the fresh-open report JSON + capability set |
 | `census-diff.log` | which sqlite_master entries the census expects and the store lacks |
 | `backup-second-run.log` | first backup ok, second to the same path refused |
-| `bulk-ab.log` | 2,000 messages: 19.48 s through the boundary vs 0.048 s in one transaction |
+| `bulk-ab.log` | pre-batch baseline (DF-HRS-109), 2,000 messages one commit per RPC: 27.64 s vs 0.047 s bare-stdlib single transaction = 592.7x (the earlier prose figure of 19.48 s did not match this log; corrected 2026-10-19) |
+| `../hrs109/batch-2000-wire.log` | DF-HRS-112 re-measurement with the batch API on the wire, N=2000 ×3: per-message wire 24.3 s median vs ONE `append_messages_batch` RPC 2.07 s median (967 msg/s) = **11.7x**; stdlib control 0.069 s. The old "boundary vs one-transaction" gap was per-RPC commit overhead, not per-message cost |
 | `params.log` | missing params fail closed; wrong-typed `create` silently defaults |
 | `bunker-*.log`, `bunker-install-leg.out` | the documented fresh-install path, timed, with the 5 failures |
 | `control-host-cargo-test.log` | 29/29 green at the same commit on a host that has the CLI |

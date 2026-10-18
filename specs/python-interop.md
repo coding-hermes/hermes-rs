@@ -200,6 +200,8 @@ Request: one JSON object per line, `{"id": <n>, "method": <name>,
 | `open` | `path`, `create`, `read_only` | capabilities + open report (schema versions, degraded list) | `StockSqliteBackend::open` |
 | `ensure_session` | `session_id`, `source?`, `model?` | `{"ensured": id}` | §6.1 `ensure_session` |
 | `append_message` | `session_id`, `role?`, `content?`, `tool_calls?`, `tool_call_id?`, `tool_name?` | `{"message_id": rowid}` | §6.1 `append_message` |
+| `append_messages_batch` | `session_id`, `messages` (array of `{role?, content?, tool_calls?, tool_call_id?, tool_name?, timestamp?, token_count?, message_uid?}`) | `{"first_id": rowid, "appended": n}` | §6.1 `append_messages_batch` |
+| `record_model_usage` | `session_id`, `model?`, `billing_provider?`, `billing_base_url?`, `billing_mode?`, `task?`, `api_call_count?`, `input_tokens?`, `output_tokens?`, `cache_read_tokens?`, `cache_write_tokens?`, `reasoning_tokens?`, `estimated_cost_usd?`, `cost_status?`, `cost_source?` | `{"ok": true}` | §6.1 `record_model_usage` upsert |
 | `get_messages` | `session_id`, `limit?` | `{"messages": [...]}` ascending rowid | §6.1 `get_messages` |
 | `get_session` | `session_id` | session projection or `null` | §6.1 (read) |
 | `end_session` | `session_id`, `end_reason?` | `{"status": "ended"|"already_ended", "generation_bumped": bool}` | §6.1 `end_session` (first end wins) |
@@ -250,10 +252,17 @@ no separate runner needed) executes, in one cargo invocation:
    - **lifecycle**: verifies zero adapter processes remain (exact-argv0
      `/proc` scan, self-match-safe) and zero `-wal`/`-shm` sidecars after
      the final clean close;
-   - the driver prints machine-checkable markers (`ROUNDTRIP_OK`,
-     `SQLITE3_REOPEN_OK`, `SQLITE_SCHEMA_VERSION=31`, `ERROR_STRUCTURED`,
-     `LIFECYCLE_CLEAN`) and the Rust test asserts every marker — exit 0
-     alone would not be evidence.
+   - the driver prints machine-checkable markers (`ROUNDTRIP_OK`, `BATCH_WIRE_OK`,
+     `MODEL_USAGE_WIRE_OK`, `SQLITE3_REOPEN_OK`, `SQLITE_SCHEMA_VERSION=31`,
+     `ERROR_STRUCTURED`, `LIFECYCLE_CLEAN`, `HRS112_WIRE_CLEAN`) and the Rust
+     test asserts every marker — exit 0
+     alone would not be evidence. Since DF-HRS-112 the default proof also
+     drives `append_messages_batch` (N=200, asserts `first_id > 0` and
+     `appended == N`, counters verified, durable across a second adapter
+     process) and `record_model_usage` (asserts the `{"ok": true}` reply and
+     that the deltas land on the session row) end-to-end over the same wire
+     (`--mode batch-wire` runs that leg standalone; the standalone mode builds
+     the release adapter per the DF-HRS-112 contract).
 2. **`hrs003_protocol_hello_reports_boundary_and_schema`** — Rust-side
    protocol check: `hello` reports the process boundary and schema 31.
 3. **`hrs003_protocol_unknown_method_fails_closed_nonzero`** — an unknown
@@ -328,6 +337,8 @@ cargo test --test hrs003_python_interop        # just this boundary
 
 # Standalone (manual) driver runs:
 python3 scripts/hrs003_e2e_proof.py --adapter <path-to-hermes-rs-session-adapter>
+python3 scripts/hrs003_e2e_proof.py --mode batch-wire            # DF-HRS-112 leg alone (builds release adapter)
+python3 scripts/hrs003_e2e_proof.py --mode bulk-wire --bulk-n 2000 --bulk-runs 3   # consumer-scale re-measurement
 python3 scripts/hrs003_e2e_proof.py --mode broken --out docs/evidence/hrs003/broken-case-transcript.txt \
     --adapter <path-to-hermes-rs-session-adapter>
 ```

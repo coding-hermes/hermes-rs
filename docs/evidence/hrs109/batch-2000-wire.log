@@ -1,0 +1,23 @@
+# DF-HRS-112 batch-on-the-wire consumer-scale re-measurement
+Date: 2026-10-19T01:01:30Z
+Python: 3.11.15  sqlite3 lib: 3.53.1
+Adapter binary: /var/tmp/hermes-cargo-target/release/hermes-rs-session-adapter (built release profile)
+Adapter git HEAD: c4d1e1ffa97aa0c89047cf225bb94ab8036be21b
+N=2000 messages per protocol, repeats=3
+Arms: (A) per-message append_message, one durable commit per call, over the wire; (B) ONE append_messages_batch call over the wire (one transaction, like the original stdlib control); (C) stdlib sqlite3 executemany in ONE transaction (original control).
+
+RUN1 A_per_message_wire=25.006s (80 msg/s)
+RUN1 B_batch_wire=1.683s (1188 msg/s)
+RUN1 C_one_txn_sqlite=0.043s (46379 msg/s)
+RUN2 A_per_message_wire=19.680s (102 msg/s)
+RUN2 B_batch_wire=2.123s (942 msg/s)
+RUN2 C_one_txn_sqlite=0.072s (27717 msg/s)
+RUN3 A_per_message_wire=24.271s (82 msg/s)
+RUN3 B_batch_wire=2.068s (967 msg/s)
+RUN3 C_one_txn_sqlite=0.069s (28894 msg/s)
+
+MEDIAN A_per_message_wire=24.271s (82 msg/s)
+MEDIAN B_batch_wire=2.068s (967 msg/s)
+MEDIAN C_one_txn_sqlite=0.069s (28894 msg/s)
+RATIO per_message/batch (wire) = 11.7x
+NOTE: arm A here (one durable commit per append_message RPC) is the arm the 2026-10-17 bulk-ab.log measured at 27.6s/592.7x; arm B is the batch API on the wire; arm C is the original stdlib control.
