@@ -224,13 +224,24 @@ fn hrs003_protocol_malformed_json_fails_closed_nonzero() {
 fn hrs003_broken_case_fails_and_evidence_is_written() {
     let run_copy = adapter_run_copy("broken");
     let adapter = run_copy.display().to_string();
+    // Write to a temp path first, then compare against the tracked file.
+    // Only overwrite if content actually changed — this stops every test
+    // run from dirtying the working tree with a regenerated timestamp.
+    let temp_transcript = std::env::temp_dir().join(format!(
+        "hrs003-broken-case-{}-{}.txt",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos()
+    ));
     let (ok, stdout, stderr) = run_python(
         PROOF_DRIVER,
         &[
             "--mode",
             "broken",
             "--out",
-            BROKEN_TRANSCRIPT,
+            temp_transcript.to_str().expect("temp path is valid UTF-8"),
             "--adapter",
             &adapter,
         ],
@@ -240,8 +251,8 @@ fn hrs003_broken_case_fails_and_evidence_is_written() {
         ok,
         "the broken-case driver itself must complete its negative proof\n--- stdout ---\n{stdout}\n--- stderr ---\n{stderr}"
     );
-    let evidence = std::fs::read_to_string(repo_root().join(BROKEN_TRANSCRIPT))
-        .expect("broken-case evidence transcript exists");
+    let evidence = std::fs::read_to_string(&temp_transcript)
+        .expect("broken-case evidence transcript exists in temp path");
     assert!(
         evidence.contains("BROKEN_CASE_VERIFIED"),
         "transcript must record the verified negative outcome:\n{evidence}"
@@ -250,4 +261,30 @@ fn hrs003_broken_case_fails_and_evidence_is_written() {
         evidence.contains("SessionRowMissing"),
         "transcript must name the structured error class:\n{evidence}"
     );
+    // Only update the tracked file if substantive content actually changed.
+    // The transcript contains volatile lines (Date, Adapter binary path) that
+    // change every run — strip them before comparing so we don't dirty the
+    // working tree with regenerated timestamps.
+    let stable_evidence = evidence
+        .lines()
+        .filter(|line| !line.starts_with("Date:") && !line.starts_with("Adapter binary:"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let tracked_path = repo_root().join(BROKEN_TRANSCRIPT);
+    let should_update = match std::fs::read_to_string(&tracked_path) {
+        Ok(existing) => {
+            let stable_existing = existing
+                .lines()
+                .filter(|line| !line.starts_with("Date:") && !line.starts_with("Adapter binary:"))
+                .collect::<Vec<_>>()
+                .join("\n");
+            stable_existing != stable_evidence
+        }
+        Err(_) => true, // file doesn't exist yet
+    };
+    if should_update {
+        std::fs::copy(&temp_transcript, &tracked_path)
+            .expect("copy temp transcript to tracked path");
+    }
+    let _ = std::fs::remove_file(&temp_transcript);
 }
