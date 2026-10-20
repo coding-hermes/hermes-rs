@@ -83,11 +83,12 @@ workarounds. What is still true:
   sessions therefore cannot be time-ordered or date-filtered faithfully (`DF-HRS-115`).
 - **`session_model_usage` is write-only through the documented API.** `record_model_usage`
   works (and folds into the session projection), but no `ReadTxn` method and no adapter
-  method returns the rollup — read it with raw SQL against
-  `session_model_usage(session_id, model, billing_provider, billing_base_url,
-  billing_mode, task, api_call_count, input_tokens, output_tokens, cache_read_tokens,
-  cache_write_tokens, reasoning_tokens, estimated_cost_usd, cost_status, cost_source)`
-  (`DF-HRS-115`).
+  method returns the rollup — read it with raw SQL against `session_model_usage`; its
+  columns, in the DDL's order, are `session_id`, `model`, `billing_provider`,
+  `billing_base_url`, `billing_mode`, `task`, `api_call_count`, `input_tokens`,
+  `output_tokens`, `cache_read_tokens`, `cache_write_tokens`, `reasoning_tokens`,
+  `estimated_cost_usd`, `actual_cost_usd`, `cost_status`, `cost_source`, `first_seen`,
+  `last_seen` (as `src/persistence/upstream_ddl.rs` declares them; `DF-HRS-115`).
 - **`search` is token-based, never substring.** Word-class queries are safe now (`notes`,
   `brand`, `android` all match exactly), paths and punctuation survive (`src/main.rs`,
   `state.db`, `C++`, `O'Brien`), CJK is served through the trigram index even though

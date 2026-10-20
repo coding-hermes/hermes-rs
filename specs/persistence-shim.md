@@ -755,6 +755,35 @@ transaction (§3.3) unless noted:
   (batch append is one operation by definition).
 - `end_session` after `append_message` is ordered by transaction commit
   order; the first end wins and later ends are no-ops (§2.4).
+- What this slice does **not** do — the two limits a consumer hits when the
+  store is used as an archive (importing existing sessions) rather than as a
+  live session writer, both measured from outside the repo:
+- **Session time columns are set by the store, not the caller.** Neither
+  `WriteTxn::ensure_session(session_id, source, model)` nor the adapter's
+  `ensure_session` accepts a timestamp (§6.1), so every imported session is
+  stamped with the import wall-clock and a session's `started_at` can postdate
+  the timestamps of its own messages. Those columns must not be relied on for
+  time-range or activity-ordered queries: `idx_sessions_effective_activity`
+  (§2.3) and the `after_ts`/`before_ts` windows (§2.4) are bounded by
+  `sessions.started_at`, so a date-filtered or activity-ordered query over an
+  imported archive is meaningless. (An explicit-time form of `ensure_session`
+  on the same engine-neutral API would close this; it is deliberately not part
+  of this slice — that decision belongs to the owner if importers come into
+  scope.)
+- **The per-model usage rollup is write-only through the boundary.**
+  `record_model_usage(session_id, model, …)` (§6.1) writes
+  `session_model_usage` and folds the delta into the session projection in the
+  same transaction, but neither `ReadTxn` nor the adapter exposes a method that
+  returns those rows — the repo's own test reads them with raw rusqlite SQL. A
+  consumer that needs them (a cost report) reads the table with SQL; its
+  columns, in the DDL's order, are `session_id`, `model`, `billing_provider`,
+  `billing_base_url`, `billing_mode`, `task`, `api_call_count`, `input_tokens`,
+  `output_tokens`, `cache_read_tokens`, `cache_write_tokens`,
+  `reasoning_tokens`, `estimated_cost_usd`, `actual_cost_usd`, `cost_status`,
+  `cost_source`, `first_seen`, `last_seen`
+  (`src/persistence/upstream_ddl.rs`, `CREATE TABLE IF NOT EXISTS
+  session_model_usage`); `scripts/check-project-artifacts.py` asserts this list
+  against that DDL.
 
 ### 6.3 Verification path for the slice
 
