@@ -94,24 +94,79 @@ fn has_sqlite3_cli() -> bool {
         .unwrap_or(false)
 }
 
+/// One process-wide lock, so two threads of this test binary can never
+/// interleave the bytes of two records. A single `write_all` reaches the
+/// kernel as one `write(2)` for a short record, but a short write would append
+/// its remainder *after* whatever another thread wrote in between, so the lock
+/// is what actually makes "one record = one line" hold.
+static SKIP_LOG_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// Directory holding the skip log: `$CARGO_TARGET_DIR` when set, else this
+/// crate's own `target/`.
+fn skip_log_dir() -> PathBuf {
+    std::env::var_os("CARGO_TARGET_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target"))
+}
+
+/// Append ONE skip record to `log` as exactly one physical line.
+///
+/// DF-HRS-116: this file carried a second, identical copy of the skip helper
+/// (a fix in `hrs010_session_store.rs` alone would have left the same defect
+/// class here). `writeln!` emits one `write(2)` per format fragment and
+/// `O_APPEND` makes each of *those* atomic, not the record, so concurrent
+/// skippers can glue two records onto one line. The whole record, trailing
+/// newline included, is built into one `String` first and handed to a single
+/// `write_all` while `SKIP_LOG_LOCK` is held.
+fn append_skip_record(log: &std::path::Path, reason: &str) {
+    // The record must be exactly one line: assert the shape BEFORE writing, so
+    // a future edit that drops the newline (or folds a newline into the reason)
+    // fails loudly here instead of gluing two records onto one line.
+    let line = format!("{reason}\n");
+    assert!(
+        line.ends_with('\n'),
+        "skip-log record must carry its own trailing newline, got {line:?}"
+    );
+    assert_eq!(
+        line.len(),
+        reason.len() + 1,
+        "skip-log record must be the reason plus exactly one newline, got {line:?}"
+    );
+    assert!(
+        !reason.contains('\n'),
+        "a skip reason must not itself span lines, got {reason:?}"
+    );
+    if let Some(parent) = log.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    // A poisoned lock must not silently swallow the evidence that a test was
+    // skipped: take the guard back out of the poison and still write.
+    let _guard = SKIP_LOG_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(log)
+    {
+        use std::io::Write;
+        let _ = f.write_all(line.as_bytes());
+        let _ = f.flush();
+    }
+}
+
+/// Answer whether the caller must return early because the `sqlite3` CLI is
+/// absent, recording the reason on stderr and in
+/// `hrs105-skipped-tests.log` under the Cargo target directory. The write goes
+/// through `append_skip_record`, so one skipped test is always exactly one
+/// line even when several tests skip at once (DF-HRS-116).
 fn skip_without_sqlite3_cli(test: &str) -> bool {
     if has_sqlite3_cli() {
         return false;
     }
     let reason = format!("SKIPPED: {test} — sqlite3 CLI not available on this machine");
     eprintln!("{reason}");
-    let dir = std::env::var_os("CARGO_TARGET_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target"));
-    let _ = std::fs::create_dir_all(&dir);
-    if let Ok(mut f) = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(dir.join("hrs105-skipped-tests.log"))
-    {
-        use std::io::Write;
-        let _ = writeln!(f, "{reason}");
-    }
+    append_skip_record(&skip_log_dir().join("hrs105-skipped-tests.log"), &reason);
     true
 }
 
@@ -302,4 +357,83 @@ fn df105_fallback_requires_literal_presence_not_a_wildcard_match() {
         "'ok_x' must match the live literal in 'aok_x' and NOT wildcard-match 'aokXx'"
     );
     drop(store);
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// DF-HRS-116: this file's skip helper carried the same non-atomic
+// `writeln!`-on-the-log write as `hrs010_session_store.rs`; the test below
+// pins the sibling copy too, so "one record = one line" cannot regress in
+// either file unnoticed.
+// ────────────────────────────────────────────────────────────────────────
+
+/// Read the log and assert it holds exactly `expected` records in exactly
+/// `expected` physical lines, each line being exactly one record.
+fn assert_skip_log_lines(log: &std::path::Path, expected: usize) {
+    let raw = std::fs::read_to_string(log).expect("read skip log");
+    assert!(raw.ends_with('\n'), "log must end with a newline: {raw:?}");
+    let lines: Vec<&str> = raw.lines().collect();
+    assert_eq!(
+        lines.len(),
+        expected,
+        "log holds {} lines: {lines:?}",
+        lines.len()
+    );
+    assert_eq!(
+        raw.matches("SKIPPED:").count(),
+        expected,
+        "records were glued onto one line: {raw:?}"
+    );
+    let mut names = std::collections::BTreeSet::new();
+    for line in &lines {
+        let body = line
+            .strip_prefix("SKIPPED: ")
+            .unwrap_or_else(|| panic!("line is not a skip record: {line:?}"));
+        let (name, reason) = body
+            .split_once(" — ")
+            .unwrap_or_else(|| panic!("record has no ' — ' separator: {line:?}"));
+        assert!(
+            !name.is_empty() && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'),
+            "first field must be exactly one test name, got {name:?} in {line:?}"
+        );
+        assert!(!reason.is_empty(), "record carries no reason: {line:?}");
+        assert!(
+            !reason.contains("SKIPPED:"),
+            "two records were glued onto one line: {line:?}"
+        );
+        assert!(
+            names.insert(name.to_string()),
+            "duplicate record for {name}"
+        );
+    }
+}
+
+#[test]
+fn df116_concurrent_skips_write_one_line_per_record() {
+    const THREADS: usize = 32;
+    const ROUNDS: usize = 4;
+    let dir = std::env::temp_dir().join(format!(
+        "hrs105-skiplog-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&dir).expect("create skip-log scratch dir");
+    let log = dir.join("hrs105-skipped-tests.log");
+    for round in 0..ROUNDS {
+        std::thread::scope(|scope| {
+            for t in 0..THREADS {
+                let log = log.clone();
+                scope.spawn(move || {
+                    let reason = format!(
+                        "SKIPPED: t{round}_{t} — sqlite3 CLI not available on this machine"
+                    );
+                    append_skip_record(&log, &reason);
+                });
+            }
+        });
+        assert_skip_log_lines(&log, (round + 1) * THREADS);
+    }
+    let _ = std::fs::remove_dir_all(&dir);
 }
