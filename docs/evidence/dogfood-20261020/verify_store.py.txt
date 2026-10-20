@@ -1,0 +1,92 @@
+#!/usr/bin/env python3
+"""Independent verification of a store written by the hrspack consumer.
+
+Reads the store with the SYSTEM sqlite3 (a different SQLite build than the
+crate links) and compares every stored message against the corpus text, so we
+are not trusting the tool that wrote it.
+
+Usage: python3 verify_store.py <store.db> <corpus.jsonl> <report.json>
+"""
+import json
+import re
+import sqlite3
+import sys
+
+
+def main():
+    db, corpus, out = sys.argv[1], sys.argv[2], sys.argv[3]
+    rep = {"db": db, "corpus": corpus}
+    con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+    rep["integrity_check"] = con.execute("PRAGMA integrity_check").fetchone()[0]
+    rep["journal_mode"] = con.execute("PRAGMA journal_mode").fetchone()[0]
+    rep["schema_version_rows"] = con.execute("SELECT version FROM schema_version").fetchall()
+    rep["sessions"] = con.execute("SELECT COUNT(*) FROM sessions").fetchone()[0]
+    rep["messages"] = con.execute("SELECT COUNT(*) FROM messages").fetchone()[0]
+    rep["usage_rows"] = con.execute("SELECT COUNT(*) FROM session_model_usage").fetchone()[0]
+    rep["tables"] = sorted(
+        r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")
+    )
+    rep["fts_tables"] = sorted(
+        r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE name LIKE '%fts%'")
+    )
+    rep["uid_bad"] = con.execute(
+        "SELECT COUNT(*) FROM messages WHERE message_uid IS NOT NULL AND "
+        "message_uid NOT GLOB '[0-9a-f][0-9a-f]*'"
+    ).fetchone()[0]
+    rep["uid_null"] = con.execute(
+        "SELECT COUNT(*) FROM messages WHERE message_uid IS NULL"
+    ).fetchone()[0]
+    rep["ts_kind"] = con.execute(
+        "SELECT typeof(timestamp) FROM messages LIMIT 1"
+    ).fetchone()[0]
+    rep["session_counters"] = con.execute(
+        "SELECT COUNT(*) FROM sessions WHERE message_count != ("
+        " SELECT COUNT(*) FROM messages m WHERE m.session_id = sessions.id)"
+    ).fetchone()[0]
+
+    # byte-fidelity: rebuild every stored message from the corpus and compare
+    con.row_factory = sqlite3.Row
+    stored = {}
+    for r in con.execute("SELECT session_id, content, id FROM messages ORDER BY id"):
+        stored.setdefault(r["session_id"], []).append(r["content"])
+    con.close()
+
+    mism = []
+    n = 0
+    for line in open(corpus, encoding="utf-8"):
+        line = line.strip()
+        if not line:
+            continue
+        s = json.loads(line)
+        got = stored.get(s["session_id"], [])
+        want = [m.get("content") for m in s["messages"]]
+        if len(got) != len(want):
+            mism.append({"session": s["session_id"], "why": "count", "got": len(got), "want": len(want)})
+        for i, (g, w) in enumerate(zip(got, want)):
+            n += 1
+            if g != w:
+                mism.append({
+                    "session": s["session_id"], "idx": i,
+                    "got": (g or "")[:60], "want": (w or "")[:60],
+                    "got_len": len(g or ""), "want_len": len(w or ""),
+                })
+    rep["messages_compared"] = n
+    rep["mismatches"] = len(mism)
+    rep["mismatch_sample"] = mism[:5]
+    rep["uid_len_ok"] = None
+    rep["nonascii_ok"] = all(
+        m["got_len"] == m["want_len"] for m in mism if m.get("why") is None
+    )
+    with open(out, "w", encoding="utf-8") as fh:
+        json.dump(rep, fh, ensure_ascii=False, indent=1)
+    for k in ("integrity_check", "journal_mode", "schema_version_rows", "sessions", "messages",
+              "usage_rows", "uid_bad", "uid_null", "ts_kind", "session_counters",
+              "messages_compared", "mismatches"):
+        print(f"{k}: {rep[k]}")
+    print(f"fts_tables: {rep['fts_tables']}")
+    if mism:
+        print("first mismatches:", json.dumps(mism[:3], ensure_ascii=False)[:400])
+
+
+if __name__ == "__main__":
+    main()

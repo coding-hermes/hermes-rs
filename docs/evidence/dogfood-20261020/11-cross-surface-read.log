@@ -1,0 +1,8 @@
+hello: {"id": 1, "result": {"boundary": "process (subprocess, newline-delimited JSON-RPC over stdio)", "knows_schema_version": 31, "language": "rust", "protocol": "hermes-rs/session-adapter/1"}}
+open: capabilities={"bulk_parameter_limit": 999, "checkpoint_passive_only": true, "file_format_standard_sqlite": true, "fts_base": true, "fts_cjk": false, "fts_trigram": true, "journal": "Wal"}
+open: created_new_store=False degraded=[]
+get_session: {"id": 3, "result": {"api_call_count": 12, "end_reason": "idle", "ended_at": 1792510533.454608, "estimated_cost_usd": 0.0124, "id": "sess-00000-eb6024", "input_tokens": 7637, "message_count": 20, "model": "openai-codex/gpt-6-luna", "output_tokens": 734, "parent_session_id": null, "session_key": null
+search over the wire: 5 hits
+  first hit: {"message_id": 17, "rank": -5.008929820327891, "role": "user", "session_id": "sess-00000-eb6024", "snippet": "The needle >>>HRSNEEDLE7F3<<< is buried in this line on purpose."}
+get_messages over the wire: 2
+frame shutdown: <no reply; process rc=0>

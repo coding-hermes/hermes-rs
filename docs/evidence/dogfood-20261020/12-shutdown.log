@@ -1,0 +1,4 @@
+hello reply: {"id":1,"result":{"boundary":"process (subprocess, newline-delimited JSON-RPC ov
+shutdown reply after 0.00s: ''
+exit after shutdown: rc=0 (waited 0.00s)
+stderr: 

@@ -1,0 +1,21 @@
+### corpus: 200 sessions, 4000 messages
+### mode=batch (append_messages_batch)
+opened out/ev-b-1.db schema_before=None schema_after=Some(31) created_new_store=true degraded=[] quarantined=None
+import mode=batch sessions=200 messages=4000 wall_s=5.397 msg_per_s=741.1 first_id_min=1
+  run1 wall=7.79 user=1.22 sys=0.18
+opened out/ev-b-2.db schema_before=None schema_after=Some(31) created_new_store=true degraded=[] quarantined=None
+import mode=batch sessions=200 messages=4000 wall_s=9.253 msg_per_s=432.3 first_id_min=1
+  run2 wall=10.83 user=1.32 sys=0.20
+opened out/ev-b-3.db schema_before=None schema_after=Some(31) created_new_store=true degraded=[] quarantined=None
+import mode=batch sessions=200 messages=4000 wall_s=10.507 msg_per_s=380.7 first_id_min=1
+  run3 wall=13.88 user=1.27 sys=0.19
+### mode=single (append_message in a loop, same one-txn-per-session shape)
+opened out/ev-s-1.db schema_before=None schema_after=Some(31) created_new_store=true degraded=[] quarantined=None
+import mode=single sessions=200 messages=4000 wall_s=4.471 msg_per_s=894.7 first_id_min=1
+  run1 wall=8.18 user=1.13 sys=0.17
+opened out/ev-s-2.db schema_before=None schema_after=Some(31) created_new_store=true degraded=[] quarantined=None
+import mode=single sessions=200 messages=4000 wall_s=4.804 msg_per_s=832.6 first_id_min=1
+  run2 wall=7.00 user=1.07 sys=0.18
+opened out/ev-s-3.db schema_before=None schema_after=Some(31) created_new_store=true degraded=[] quarantined=None
+import mode=single sessions=200 messages=4000 wall_s=17.318 msg_per_s=231.0 first_id_min=1
+  run3 wall=19.11 user=1.27 sys=0.22

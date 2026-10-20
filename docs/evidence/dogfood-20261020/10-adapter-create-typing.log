@@ -1,0 +1,25 @@
+adapter: /var/tmp/hermes-cargo-target/release/hermes-rs-session-adapter
+
+--- no create at all ---
+  reply: {"error":{"cause":"unknown","detail":"io error: sqlite error (14): unable to open database file: out/adapter-scratch/a.db","error":"Io"},"id":2}
+  file created: False  process rc: 0  stderr: ''
+
+--- create: true ---
+  reply: {"id":2,"result":{"capabilities":{"bulk_parameter_limit":999,"checkpoint_passive_only":true,"file_format_standard_sqlite":true,"fts_base":true,"fts_cjk":false,"fts_trigram":true,"journal":"Wal"},"report":{"columns_reconc
+  file created: True  process rc: 0  stderr: ''
+
+--- create: "yes" (string) ---
+  reply: {"error":{"cause":"unknown","detail":"io error: sqlite error (14): unable to open database file: out/adapter-scratch/c.db","error":"Io"},"id":2}
+  file created: False  process rc: 0  stderr: ''
+
+--- create: 1 (number) ---
+  reply: {"error":{"cause":"unknown","detail":"io error: sqlite error (14): unable to open database file: out/adapter-scratch/d.db","error":"Io"},"id":2}
+  file created: False  process rc: 0  stderr: ''
+
+--- create: null ---
+  reply: {"error":{"cause":"unknown","detail":"io error: sqlite error (14): unable to open database file: out/adapter-scratch/e.db","error":"Io"},"id":2}
+  file created: False  process rc: 0  stderr: ''
+
+--- read_only: "true" (string) ---
+  reply: {"id":2,"result":{"capabilities":{"bulk_parameter_limit":999,"checkpoint_passive_only":true,"file_format_standard_sqlite":true,"fts_base":true,"fts_cjk":false,"fts_trigram":true,"journal":"Wal"},"report":{"columns_reconc
+  file created: True  process rc: 0  stderr: ''

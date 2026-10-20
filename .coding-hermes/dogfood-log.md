@@ -74,3 +74,64 @@
   a fresh store reports not-fresh + degraded, the documented smoke fails on a clean box).
 - Artifacts: docs/dogfood/2026-10-17-run2-integration.md, docs/dogfood/diagnostics.md,
   skills/hermes-rs-usage/SKILL.md, docs/evidence/dogfood-20261017/ (21 files).
+
+## 2026-10-20 dogfood tick (run 3)
+- HEAD: 7331204 (main, pushed; run 2 was at 887a257). QA-HEAD pulled ff-only by the
+  install leg = 7331204.
+- Delta/angle vs runs 1-2: runs 1-2 covered the spec-stage scripts and the **Python**
+  adapter boundary. Run 3 takes the surface neither touched — **the Rust library used as a
+  library, by a real consumer crate written OUTSIDE the repo**
+  (/home/kara/hrs-dogfood-20261020, `hrspack`: pack Hermes-shaped session JSONL into a
+  state.db-compatible archive, search it, record usage, snapshot it) — and re-verifies the
+  eight remembered traps, because every one of them is closed on the board.
+- Promise: "a Rust program can open a state.db-compatible store through the engine-neutral
+  SessionStore API, write/search/back up, and a second surface can read the same file."
+- Real-use pass (evidence: docs/evidence/dogfood-20261020/): 200 sessions x 20 msgs =
+  4,000 messages imported both ways (batch API and per-message loop, one txn per session);
+  system-sqlite3 read-back: integrity ok, schema 31, sessions/messages/usage rows correct,
+  4,000/4,000 messages byte-identical (CJK, emoji, accents, specials); 20 search probes vs a
+  corpus-derived token oracle = 19/20 exact, the 20th (`state*`) explained as inherited FTS
+  prefix semantics; the Rust-written store read back through the stdio adapter with matching
+  counts; backup to the SAME destination twice now succeeds (DF-HRS-108 re-proof); usage
+  delta folds into the session projection exactly.
+- Trap re-verification (all 8 closed rows, from the consumer side at 7331204): DF-HRS-104
+  (notes 610/610, brand 658/658), 105 (src/main.rs 854/854, state.db 979/979, C++, O'Brien),
+  106 (created_new_store=true on create / false on reopen), 107 (degraded=[]), 108 (backup
+  overwrite ok), 109 (batch surface exercised), 110 (with a sqlite3 shim failing --version:
+  23 passed / 0 failed, 5 SKIPPED with reasons in the log), 111 (tree clean after two suite
+  runs). Suite at HEAD with a real sqlite3 CLI: 43 passed / 0 failed / 1 ignored, 49 s.
+- Install leg: bunker-qa.sh launch -> LAUNCHED agent=3299f0f7 on bunker-mvp, ff-only QA HEAD
+  7331204, evidence /tmp/bunker-qa-evidence-20261020T152815Z-1151160.jsonl. Live peek over
+  `bunker exec`: 6 cells graded (last toolchain-bootstrap OK, INFO missing openssl), a live
+  cargo with etime 06:01, host disk at 100% (143G/150G, 1.1G free = the documented HARNESS
+  disk class). Status at close: PARTIAL — running, not graded, so NOT a silent pass and NOT
+  a SKIPPED-install-bunker row. Finish with `bunker-qa.sh collect --evidence <path>`.
+- Findings filed (5): DF-HRS-113 the usage skill still teaches workarounds for eight fixed
+  defects (agents waste effort and distrust correct signals); DF-HRS-114 the adapter's `open`
+  silently ignores wrong-typed `create`/`read_only` (read_only:"true" opens READ-WRITE);
+  DF-HRS-115 contract/docs gap — session start time is not settable on either surface
+  (imported sessions are stamped with the import wall-clock, so archive time-ordering is
+  wrong) and `session_model_usage` is write-only through the documented API; DF-HRS-116 the
+  skip log can glue two records onto one line (non-atomic writeln! from concurrent test
+  threads); DF-HRS-117 events.jsonl line 22 is a fused JSONL record, so
+  `boardctl validate -C .` FAILs (1 error) on the committed blob. Plus an EVENT on
+  DF-HRS-112: at the Rust API level with one txn per session, batch and per-message loops are
+  indistinguishable (the wire row-trip saving is where the 11.7x comes from).
+- Docs gap noted (not a row, unchanged from run 2): the repo has no docs/qa/use-cases.md
+  catalog and no run-history.jsonl, so this log stays the single canonical history by the
+  repo's existing convention.
+- Step 2b (perf): nothing a user would feel, so no PERF row. Cold build of a consumer 83 s;
+  cold store creation 1.19-1.40 s clean (3.0-4.4 s under load); warm open of a 4,000-message
+  store 0.06 s; import of 4,000 messages 4.5-17.3 s with user CPU 1.0-1.3 s in every run
+  (~0.3 ms/message — wall is commit I/O); end-to-end CLI search 127-169 ms wall / 6-18 ms
+  user, in-process query 1.3-14.5 ms. Wall numbers swing up to 4x with host load (9-23 on 16
+  cores plus a concurrent bunker build); the CPU column is the stable signal.
+- Verdict: PROMISING-BUT-ROUGH, leaning SHIPPABLE for the persistence slice. The promise
+  holds under real use and run 2's roughness is largely repaired; what remains is archive-use
+  edges (unsettable session times, write-only usage rollup), the fail-silent adapter flags,
+  two artifact-hygiene defects, and the stale usage skill (corrected this run).
+- Artifacts: docs/dogfood/2026-10-20-run3-integration.md, docs/dogfood/diagnostics.md
+  (run-3 addendum), docs/evidence/dogfood-20261020/ (11 logs + 3 JSON result sets + consumer
+  and probe sources + run_evidence.sh to regenerate), skills/hermes-rs-usage/SKILL.md
+  (traps rewritten to verified state).
+- Addendum: the DF-HRS-112 measurement event could not be attached — `boardctl event` REFUSES to write while events.jsonl line 22 stays fused (it printed the fused-line error and appended nothing, so events.jsonl was unchanged at 41 lines). The measurement therefore lives in docs/dogfood/diagnostics.md §4 and in docs/evidence/dogfood-20261020/02-import-both-modes.log; filed as DF-HRS-117.

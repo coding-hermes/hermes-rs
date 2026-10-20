@@ -1,0 +1,27 @@
+integrity_check: ok
+journal_mode: wal
+schema_version_rows: [(31,)]
+sessions: 200
+messages: 4000
+usage_rows: 200
+uid_bad: 0
+uid_null: 0
+ts_kind: real
+session_counters: 0
+messages_compared: 4000
+mismatches: 0
+fts_tables: ['messages_fts', 'messages_fts_config', 'messages_fts_data', 'messages_fts_delete', 'messages_fts_docsize', 'messages_fts_idx', 'messages_fts_insert', 'messages_fts_src', 'messages_fts_trigram', 'messages_fts_trigram_config', 'messages_fts_trigram_data', 'messages_fts_trigram_delete', 'messages_fts_trigram_docsize', 'messages_fts_trigram_idx', 'messages_fts_trigram_insert', 'messages_fts_trigram_src', 'messages_fts_trigram_update', 'messages_fts_update']
+
+integrity_check: ok
+journal_mode: wal
+schema_version_rows: [(31,)]
+sessions: 200
+messages: 4000
+usage_rows: 200
+uid_bad: 0
+uid_null: 0
+ts_kind: real
+session_counters: 0
+messages_compared: 4000
+mismatches: 0
+fts_tables: ['messages_fts', 'messages_fts_config', 'messages_fts_data', 'messages_fts_delete', 'messages_fts_docsize', 'messages_fts_idx', 'messages_fts_insert', 'messages_fts_src', 'messages_fts_trigram', 'messages_fts_trigram_config', 'messages_fts_trigram_data', 'messages_fts_trigram_delete', 'messages_fts_trigram_docsize', 'messages_fts_trigram_idx', 'messages_fts_trigram_insert', 'messages_fts_trigram_src', 'messages_fts_trigram_update', 'messages_fts_update']

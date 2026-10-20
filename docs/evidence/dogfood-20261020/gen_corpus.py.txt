@@ -1,0 +1,208 @@
+#!/usr/bin/env python3
+"""Generate a realistic Hermes-shaped session transcript export (JSONL).
+
+This is the CORPUS a real user of the hermes-rs session store would feed to
+an archive tool: one JSON object per session, messages in order, plus a
+per-model usage rollup. Content is realistic agent-session prose/code with
+deliberate probes: words that begin or end with and/or/not (the DF-HRS-104
+class), paths and FTS5-special characters (the DF-HRS-105 class), CJK and
+emoji, and long code blocks.
+
+Also emits truth.json: for each search probe, the set of messages that a
+correct word-aware search SHOULD return, computed from the corpus text
+itself (independent of the store under test).
+
+Usage: python3 gen_corpus.py --out corpus.jsonl --truth truth.json [--sessions N] [--msgs M] [--seed S]
+"""
+import argparse
+import json
+import random
+import re
+
+PROSE = [
+    "I pulled the notes from the last run and the brand of the failure is a stale cache.",
+    "The android build has an orphan process holding the database file open.",
+    "My notebook says the cost is $0.42 per 1M input tokens, so this run is cheap.",
+    "Honest answer: the counter and the ledger disagree, which is itself the finding.",
+    "The scanner cannot see the sandbox, so its verdict is notation-only.",
+    "We shipped the report; the orchard endpoint is still 500 when the store is locked.",
+    "I rewrote the sanitizer and the truncation is gone as far as I can tell.",
+    "Orphaned worker scopes survive a gateway restart, so the disk stays busy.",
+    "Note the difference between a token boundary and a substring match.",
+    "The brand new index is partial, which is why the planner skips it.",
+]
+
+CODE = """```rust
+fn open(path: &str) -> Result<Store, Error> {{
+    let opts = OpenOptions::read_write(path);
+    StockSqliteBackend::open(opts)
+}}
+```
+The file it writes is `{path}` and the check is `cargo test --workspace`. \
+Search for `state.db` and for `src/main.rs` when you verify this."""
+
+SPECIALS = [
+    "Query `state.db` with sqlite3 and compare to the FTS arm (cost: $0.00).",
+    "The path src/main.rs and the module src/lib.rs both changed.",
+    'She said "the store is fine" and left; the log says otherwise.',
+    "C++ / C# interop was rejected; the boundary is stdio JSON-RPC only.",
+    "Un archivo de configuración con contraseña en texto plano es un problema.",
+    "El informe dice que la base de datos quedó íntegra tras el reinicio.",
+    "数据库里的会话记录必须能被检索到，否则这次归档没有意义。",
+    "归档工具最后一步是备份 state.db，并校验字节数一致。",
+    "The padlock 🔒 in the prompt is not a token the index can see.",
+    "Emoji check: 🔒 🔒 and a second one — does any of this survive a round trip?",
+    "SELECT * FROM messages WHERE content LIKE '%notes%'; -- and what does FTS do?",
+    "O'Brien's file, and the argv[0] is a path with *glob* characters in it.",
+    "Wildcards like state* and quoted \"phrases\" are the interesting cases.",
+    "The needle HRSNEEDLE7F3 is buried in this line on purpose.",
+    "A second needle, HRSNEEDLE9Q1, sits next to the word notes for the oracle.",
+]
+
+TOOLS = [
+    ("read_file", "read 200 lines of src/persistence/stock_sqlite.rs"),
+    ("search_files", "grep for sanitize_fts5_query in src"),
+    ("terminal", "cargo test --workspace (17 passed; 5 skipped)"),
+    ("browser_exec", "open the report page and extract the table"),
+]
+
+
+def make_message(rng, idx, session_ix):
+    kind = rng.random()
+    if kind < 0.35:
+        body = rng.choice(PROSE)
+        if rng.random() < 0.25:
+            body += " " + rng.choice(SPECIALS)
+    elif kind < 0.70:
+        body = rng.choice(SPECIALS)
+    elif kind < 0.88:
+        body = CODE.format(path=f"/home/kara/sessions/{session_ix}/state.db")
+    else:
+        name, detail = rng.choice(TOOLS)
+        return {
+            "role": "assistant",
+            "tool_name": name,
+            "content": f"tool {name}: {detail}",
+            "timestamp": 1760900000.0 + session_ix * 60 + idx,
+            "token_count": rng.randint(20, 400),
+        }
+    # occasionally make it long, like a real agent reply
+    if rng.random() < 0.15:
+        body = body + " " + " ".join(rng.choice(PROSE) for _ in range(rng.randint(4, 12)))
+    role = "user" if idx % 2 == 0 else "assistant"
+    return {
+        "role": role,
+        "content": body,
+        "timestamp": 1760900000.0 + session_ix * 60 + idx,
+        "token_count": rng.randint(20, 900),
+    }
+
+
+MODELS = [
+    ("openai-codex/gpt-6-luna", "openai-codex", "https://chatgpt.com/backend-api/codex", "plan"),
+    ("glm-5.3-flash", "zai-glm-default", "https://api.z.ai/api/paas/v4", "plan"),
+    ("deepseek-v4-flash", "deepseek", "https://api.deepseek.com/v1", "payg"),
+]
+
+
+def word_predicate(term):
+    """Whole-word (token-boundary) presence — what a token index should find."""
+    pat = re.compile(r"(?<![0-9A-Za-z_])" + re.escape(term) + r"(?![0-9A-Za-z_])")
+    return lambda text: bool(pat.search(text))
+
+
+def all_tokens(tokens):
+    preds = [word_predicate(t) for t in tokens]
+    return lambda text: all(p(text) for p in preds)
+
+
+def substring(term):
+    return lambda text: term in text
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--out", default="corpus.jsonl")
+    ap.add_argument("--truth", default="truth.json")
+    ap.add_argument("--sessions", type=int, default=200)
+    ap.add_argument("--msgs", type=int, default=20)
+    ap.add_argument("--seed", type=int, default=20261020)
+    a = ap.parse_args()
+    rng = random.Random(a.seed)
+
+    sessions = []
+    with open(a.out, "w", encoding="utf-8") as fh:
+        for s in range(a.sessions):
+            sid = f"sess-{s:05d}-{rng.randrange(16**6):06x}"
+            msgs = [make_message(rng, i, s) for i in range(a.msgs)]
+            model, prov, base, mode = MODELS[s % len(MODELS)]
+            usage = [
+                {
+                    "model": model,
+                    "billing_provider": prov,
+                    "billing_base_url": base,
+                    "billing_mode": mode,
+                    "task": "chat",
+                    "api_call_count": len(msgs) // 2,
+                    "input_tokens": sum(m.get("token_count", 0) for m in msgs),
+                    "output_tokens": 512 + s,
+                    "cache_read_tokens": 128,
+                    "cache_write_tokens": 64,
+                    "reasoning_tokens": 32,
+                    "estimated_cost_usd": round(0.0001 * (s + 1), 6),
+                }
+            ]
+            rec = {
+                "session_id": sid,
+                "source": "cli" if s % 3 else "telegram",
+                "model": model,
+                "started_at": 1760900000.0 + s * 60,
+                "end_reason": "idle" if s % 5 == 0 else None,
+                "messages": msgs,
+                "usage": usage,
+            }
+            sessions.append(rec)
+            fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
+
+    # --- truth oracle: which messages SHOULD a correct search return? ---
+    probes = [
+        ("notes", 1000, word_predicate("notes")),
+        ("brand", 1000, word_predicate("brand")),
+        ("android", 1000, word_predicate("android")),
+        ("orphan", 1000, word_predicate("orphan")),
+        ("notebook", 1000, word_predicate("notebook")),
+        ("src/main.rs", 1000, all_tokens(["src", "main", "rs"])),
+        ("state.db", 1000, all_tokens(["state", "db"])),
+        ("database", 1000, word_predicate("database")),
+        ("contraseña", 1000, word_predicate("contraseña")),
+        ("数据库", 1000, substring("数据库")),
+        ("🔒", 1000, substring("\U0001f512")),
+        ("cost: $0.42", 1000, all_tokens(["cost", "0", "42"])),
+        ("C++", 1000, substring("C++")),
+        ("HRSNEEDLE7F3", 1000, word_predicate("HRSNEEDLE7F3")),
+        ("hermes-rs session store", 1000, all_tokens(["hermes", "rs", "session", "store"])),
+        ("and", 1000, word_predicate("and")),
+        ("notation", 1000, word_predicate("notation")),
+        ("O'Brien", 1000, substring("O'Brien")),
+        ("state*", 1000, substring("state*")),
+        ("cargo test --workspace", 1000, all_tokens(["cargo", "test", "workspace"])),
+    ]
+    truth = {}
+    for q, limit, pred in probes:
+        ids = []
+        for s in sessions:
+            for i, m in enumerate(s["messages"]):
+                if pred(m.get("content") or ""):
+                    ids.append(f"{s['session_id']}#{i}")
+        truth[q] = {"limit": limit, "expected": sorted(ids), "rationale": pred.__doc__ or ""}
+    with open(a.truth, "w", encoding="utf-8") as fh:
+        json.dump(truth, fh, ensure_ascii=False, indent=1)
+    total_msgs = sum(len(s["messages"]) for s in sessions)
+    print(
+        f"wrote {len(sessions)} sessions / {total_msgs} messages to {a.out}; "
+        f"{len(probes)} probes to {a.truth}"
+    )
+
+
+if __name__ == "__main__":
+    main()

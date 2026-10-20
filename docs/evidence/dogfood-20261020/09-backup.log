@@ -1,0 +1,7 @@
+opened out/ev-b-1.db schema_before=Some(31) schema_after=Some(31) created_new_store=false degraded=[] quarantined=None
+backup ok -> out/ev-snap.db
+second backup to the same dest: ok (overwrite accepted)
+opened out/ev-b-1.db schema_before=Some(31) schema_after=Some(31) created_new_store=false degraded=[] quarantined=None
+backup ok -> out/ev-snap.db
+second backup to the same dest: ok (overwrite accepted)
+4000

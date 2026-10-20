@@ -1,0 +1,112 @@
+#!/usr/bin/env python3
+"""Search-fidelity probe for the hermes-rs session store, run as a consumer.
+
+For each probe it compares what `hrspack search` returns against an
+independent oracle (truth.json, computed from the corpus text with
+token-boundary semantics).
+
+Usage: python3 probe_search.py <db> <truth.json> <corpus.jsonl> <out.json> [--bin PATH]
+"""
+import argparse
+import json
+import re
+import sqlite3
+import subprocess
+import sys
+
+
+def run_search(binary, db, query, limit):
+    p = subprocess.run(
+        [binary, "search", db, query, str(limit)],
+        capture_output=True, text=True, timeout=600,
+    )
+    if p.returncode != 0:
+        return None, p.stderr.strip() or f"rc={p.returncode}"
+    hits = []
+    for line in p.stdout.splitlines():
+        m = re.match(r"\s+hit id=(\d+) session=(\S+) role=(\S+) rank=(-?[\d.]+)", line)
+        if m:
+            hits.append({"id": int(m.group(1)), "session_id": m.group(2), "rank": float(m.group(4))})
+    hdr = re.search(r"hits=(\d+) wall_s=([\d.]+)", p.stdout)
+    return {
+        "hits": hits,
+        "reported": int(hdr.group(1)) if hdr else None,
+        "wall_s": float(hdr.group(2)) if hdr else None,
+        "open_line": p.stdout.splitlines()[0] if p.stdout else "",
+    }, None
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("db")
+    ap.add_argument("truth")
+    ap.add_argument("corpus")
+    ap.add_argument("out")
+    ap.add_argument("--bin", default="/home/kara/hrs-dogfood-20261020/target/release/hrspack")
+    a = ap.parse_args()
+
+    truth = json.load(open(a.truth, encoding="utf-8"))
+    con = sqlite3.connect(a.db)
+    idmap = {}
+    for sid, mid, in con.execute("SELECT session_id, id FROM messages ORDER BY session_id, id"):
+        idmap[mid] = sid
+    idx = {}
+    for sid, cnt in con.execute("SELECT session_id, COUNT(*) FROM messages GROUP BY session_id"):
+        idx[sid] = cnt
+    # position of a message inside its session, by ascending id
+    pos = {}
+    counters = {}
+    for sid, mid in con.execute("SELECT session_id, id FROM messages ORDER BY session_id, id"):
+        counters[sid] = counters.get(sid, 0)
+        pos[mid] = counters[sid]
+        counters[sid] += 1
+    con.close()
+
+    results = {}
+    for q, spec in truth.items():
+        limit = 5000
+        res, err = run_search(a.bin, a.db, q, limit)
+        entry = {"query": q, "limit": limit, "expected_n": len(spec["expected"])}
+        if err:
+            entry["error"] = err
+            results[q] = entry
+            print(f"{q!r}: TOOL ERROR {err}")
+            continue
+        got_keys = []
+        got_ids = set()
+        for h in res["hits"]:
+            mid = h["id"]
+            got_ids.add(mid)
+            sid = idmap.get(mid)
+            got_keys.append(f"{sid}#{pos.get(mid)}")
+        exp = set(spec["expected"])
+        got = set(got_keys)
+        missing = sorted(exp - got)
+        extra = sorted(got - exp)
+        entry.update({
+            "reported_hits": res["reported"],
+            "parsed_hits": len(res["hits"]),
+            "truncated": (res["reported"] or 0) > len(res["hits"]),
+            "wall_s": res["wall_s"],
+            "expected_n": len(exp),
+            "missing_n": len(missing),
+            "extra_n": len(extra),
+            "missing_sample": missing[:3],
+            "extra_sample": extra[:3],
+            "recall": (len(exp & got) / len(exp)) if exp else None,
+            "open_line": res["open_line"],
+        })
+        results[q] = entry
+        print(
+            f"{q!r}: expected={len(exp)} got={len(got)} recall="
+            f"{entry['recall'] if entry['recall'] is None else round(entry['recall'], 3)} "
+            f"missing={len(missing)} extra={len(extra)} wall_s={res['wall_s']}"
+        )
+        if missing:
+            print(f"    missing sample: {missing[:3]}")
+    json.dump(results, open(a.out, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    print(f"wrote {a.out}")
+
+
+if __name__ == "__main__":
+    sys.exit(main())

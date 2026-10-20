@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# Reproduce every measurement/evidence artifact for the 2026-10-20 dogfood run 3
+# of hermes-rs. Run from this directory:  bash run_evidence.sh
+# Nothing here touches the target repo (all writes land in ./logs and ./out).
+set -uo pipefail
+cd "$(dirname "$0")"
+B=./target/release/hrspack
+ADAPTER=${ADAPTER:-/var/tmp/hermes-cargo-target/release/hermes-rs-session-adapter}
+mkdir -p logs out
+say() { echo "### $*" | tee -a "$2"; }
+
+# 02/03 — import, both modes, 3 repetitions each (like-for-like: one txn per session)
+{
+  echo "### corpus: $(wc -l < corpus/corpus.jsonl) sessions, $(jq -r '.messages|length' corpus/corpus.jsonl | paste -sd+ | bc) messages"
+  echo "### mode=batch (append_messages_batch)"
+  for i in 1 2 3; do rm -f "out/ev-b-$i.db"; /usr/bin/time -f "  run$i wall=%e user=%U sys=%S" $B import corpus/corpus.jsonl "out/ev-b-$i.db" batch; done
+  echo "### mode=single (append_message in a loop, same one-txn-per-session shape)"
+  for i in 1 2 3; do rm -f "out/ev-s-$i.db"; /usr/bin/time -f "  run$i wall=%e user=%U sys=%S" $B import corpus/corpus.jsonl "out/ev-s-$i.db" single; done
+} 2>&1 | tee logs/02-import-both-modes.log
+
+# 04/05 — independent verification of the written stores
+{ python3 verify_store.py out/ev-b-1.db corpus/corpus.jsonl out/verify-batch.json; echo; python3 verify_store.py out/ev-s-1.db corpus/corpus.jsonl out/verify-single.json; } 2>&1 | tee logs/04-verify-stores.log
+
+# 06 — search fidelity vs the corpus-derived oracle
+python3 probe_search.py out/ev-b-1.db corpus/truth.json corpus/corpus.jsonl out/search-probe.json 2>&1 | tee logs/06-search-fidelity.log
+
+# 07 — open, cold (fresh scaffold) vs warm (4,000-message store)
+{
+  echo "### cold: fresh store (full upstream DDL + FTS scaffold)"
+  for i in 1 2 3; do rm -f "out/ev-cold-$i.db"; /usr/bin/time -f "  cold$i wall=%e user=%U sys=%S" $B session "out/ev-cold-$i.db" sess-x > /dev/null; done
+  echo "### warm: existing store"
+  for i in 1 2 3; do /usr/bin/time -f "  warm$i wall=%e user=%U sys=%S" $B session out/ev-b-1.db sess-00000-eb6024 > /dev/null; done
+} 2>&1 | tee logs/07-open-cold-warm.log
+
+# 08 — usage rollup: write through the API, read back through the API and raw SQL
+$B usage-probe out/ev-b-1.db sess-00000-eb6024 2>&1 | tee logs/08-usage-readback.log
+echo "--- raw sqlite3 view of the rollup row ---" | tee -a logs/08-usage-readback.log
+sqlite3 out/ev-b-1.db "SELECT session_id,model,billing_provider,billing_mode,task,api_call_count,input_tokens,output_tokens,estimated_cost_usd,cost_status,cost_source FROM session_model_usage WHERE model='probe/model';" | tee -a logs/08-usage-readback.log
+
+# 09 — backup overwrite behaviour (second call to the same destination)
+$B backup out/ev-b-1.db out/ev-snap.db 2>&1 | tee logs/09-backup.log
+$B backup out/ev-b-1.db out/ev-snap.db 2>&1 | tee -a logs/09-backup.log
+sqlite3 out/ev-snap.db "SELECT COUNT(*) AS messages_in_snapshot FROM messages;" | tee -a logs/09-backup.log
+
+# 10 — adapter: create/read_only parameter typing
+python3 probe_adapter.py "$ADAPTER" out/adapter-scratch 2>&1 | tee logs/10-adapter-create-typing.log
+
+# 11 — cross-surface: read the Rust-written store through the Python adapter
+python3 probe_adapter_read.py "$ADAPTER" out/ev-b-1.db sess-00000-eb6024 HRSNEEDLE7F3 2>&1 | tee logs/11-cross-surface-read.log
+
+# 12 — shutdown lifecycle
+python3 probe_shutdown.py "$ADAPTER" 2>&1 | tee logs/12-shutdown.log
+
+# 13 — search timings end-to-end (process start + open + search + close)
+hyperfine --warmup 3 --runs 10 --style basic \
+  -n "search-rare HRSNEEDLE7F3" "$B search out/ev-b-1.db HRSNEEDLE7F3 1000" \
+  -n "search-common and" "$B search out/ev-b-1.db and 5000" \
+  -n "search-wordclass notes" "$B search out/ev-b-1.db notes 1000" \
+  > logs/13-search-timings.log 2>&1
+grep -E "Benchmark|mean" logs/13-search-timings.log
+
+echo "evidence written to logs/ and out/"

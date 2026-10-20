@@ -1,0 +1,8 @@
+### cold: fresh store (full upstream DDL + FTS scaffold)
+  cold1 wall=4.37 user=0.01 sys=0.03
+  cold2 wall=3.01 user=0.01 sys=0.02
+  cold3 wall=3.03 user=0.01 sys=0.03
+### warm: existing store
+  warm1 wall=0.14 user=0.00 sys=0.00
+  warm2 wall=0.15 user=0.00 sys=0.00
+  warm3 wall=0.18 user=0.00 sys=0.00

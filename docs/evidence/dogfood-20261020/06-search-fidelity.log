@@ -1,0 +1,21 @@
+'notes': expected=610 got=610 recall=1.0 missing=0 extra=0 wall_s=0.009456
+'brand': expected=658 got=658 recall=1.0 missing=0 extra=0 wall_s=0.00609
+'android': expected=419 got=419 recall=1.0 missing=0 extra=0 wall_s=0.005398
+'orphan': expected=419 got=419 recall=1.0 missing=0 extra=0 wall_s=0.006239
+'notebook': expected=455 got=455 recall=1.0 missing=0 extra=0 wall_s=0.009311
+'src/main.rs': expected=854 got=854 recall=1.0 missing=0 extra=0 wall_s=0.0085
+'state.db': expected=979 got=979 recall=1.0 missing=0 extra=0 wall_s=0.006712
+'database': expected=419 got=419 recall=1.0 missing=0 extra=0 wall_s=0.004264
+'contraseña': expected=109 got=109 recall=1.0 missing=0 extra=0 wall_s=0.002285
+'数据库': expected=113 got=113 recall=1.0 missing=0 extra=0 wall_s=0.002284
+'🔒': expected=199 got=199 recall=1.0 missing=0 extra=0 wall_s=0.00232
+'cost: $0.42': expected=455 got=455 recall=1.0 missing=0 extra=0 wall_s=0.004663
+'C++': expected=109 got=109 recall=1.0 missing=0 extra=0 wall_s=0.002277
+'HRSNEEDLE7F3': expected=111 got=111 recall=1.0 missing=0 extra=0 wall_s=0.001623
+'hermes-rs session store': expected=0 got=0 recall=None missing=0 extra=0 wall_s=0.002385
+'and': expected=2407 got=2407 recall=1.0 missing=0 extra=0 wall_s=0.017092
+'notation': expected=431 got=431 recall=1.0 missing=0 extra=0 wall_s=0.00624
+"O'Brien": expected=112 got=112 recall=1.0 missing=0 extra=0 wall_s=0.001587
+'state*': expected=130 got=1109 recall=1.0 missing=0 extra=979 wall_s=0.007127
+'cargo test --workspace': expected=857 got=857 recall=1.0 missing=0 extra=0 wall_s=0.006786
+wrote out/search-probe.json

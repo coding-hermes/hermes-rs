@@ -1,0 +1,6 @@
+opened out/ev-b-1.db schema_before=Some(31) schema_after=Some(31) created_new_store=false degraded=[] quarantined=None
+before_usage_write: Some((7526, 512, 10, Some(0.0001)))
+after_usage_write:  Some((7637, 734, 12, Some(0.0124)))
+read_back_through_api: none (no ReadTxn method returns session_model_usage rows)
+--- raw sqlite3 view of the rollup row ---
+sess-00000-eb6024|probe/model|probe|payg|chat|2|111|222|0.0123|estimated|probe

@@ -1,0 +1,385 @@
+//! hrspack — a real consumer of the hermes-rs session store.
+//!
+//! Written OUTSIDE the repo (2026-10-20 dogfood run 3), using only the
+//! documented caller-facing API from `specs/persistence-shim.md` §3.1 /
+//! §6.1 as surfaced by `skills/hermes-rs-usage/SKILL.md`.
+//!
+//! Real user job: take Hermes-shaped session transcripts exported as JSONL
+//! and (1) pack them into a state.db-compatible store, (2) search them,
+//! (3) record and inspect per-model usage, (4) snapshot the store.
+//!
+//! No internal helper is used. Nothing from `src/` is copied.
+
+use hermes_rs::persistence::{
+    AppendMessage, ModelUsageDelta, OpenOptions, Patience, ReadTxn, SessionStore, StockSqliteBackend,
+    StoreError, WriteTxn,
+};
+use std::io::Write;
+
+fn die(msg: String) -> ! {
+    eprintln!("error: {msg}");
+    std::process::exit(1);
+}
+
+fn open_rw(path: &str) -> (hermes_rs::persistence::stock_sqlite::StockSqliteStore, String) {
+    let opts = OpenOptions::read_write(path);
+    match StockSqliteBackend::open(opts) {
+        Ok((store, open)) => {
+            let line = format!(
+                "opened {} schema_before={:?} schema_after={:?} created_new_store={} degraded={:?} quarantined={:?}",
+                path,
+                open.report.schema_version_before,
+                open.report.schema_version_after,
+                open.report.created_new_store,
+                open.report.degraded,
+                open.report.quarantined
+            );
+            (store, line)
+        }
+        Err(e) => die(format!("open {path}: {e}")),
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct MsgIn {
+    role: String,
+    #[serde(default)]
+    content: Option<String>,
+    #[serde(default)]
+    timestamp: Option<f64>,
+    #[serde(default)]
+    token_count: Option<i64>,
+    #[serde(default)]
+    tool_name: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct UsageIn {
+    model: String,
+    #[serde(default)]
+    billing_provider: String,
+    #[serde(default)]
+    billing_base_url: String,
+    #[serde(default)]
+    billing_mode: String,
+    #[serde(default)]
+    task: String,
+    #[serde(default)]
+    api_call_count: i64,
+    #[serde(default)]
+    input_tokens: i64,
+    #[serde(default)]
+    output_tokens: i64,
+    #[serde(default)]
+    cache_read_tokens: i64,
+    #[serde(default)]
+    cache_write_tokens: i64,
+    #[serde(default)]
+    reasoning_tokens: i64,
+    #[serde(default)]
+    estimated_cost_usd: f64,
+}
+
+#[derive(serde::Deserialize)]
+struct SessionIn {
+    session_id: String,
+    #[serde(default = "default_source")]
+    source: String,
+    #[serde(default)]
+    model: Option<String>,
+    #[serde(default)]
+    started_at: Option<f64>,
+    #[serde(default)]
+    end_reason: Option<String>,
+    messages: Vec<MsgIn>,
+    #[serde(default)]
+    usage: Vec<UsageIn>,
+}
+
+fn default_source() -> String {
+    "export".to_string()
+}
+
+fn cmd_import(corpus: &str, db: &str, mode: &str) {
+    let f = std::fs::File::open(corpus).unwrap_or_else(|e| die(format!("corpus {corpus}: {e}")));
+    let reader = std::io::BufReader::new(f);
+    let (store, open_line) = open_rw(db);
+    println!("{open_line}");
+    // Keep the store handle alive; parse sessions lazily into memory (a real
+    // export file is read session-by-session).
+    let mut sessions: Vec<SessionIn> = Vec::new();
+    for line in std::io::BufRead::lines(reader) {
+        let line = line.unwrap_or_else(|e| die(format!("read: {e}")));
+        if line.trim().is_empty() {
+            continue;
+        }
+        match serde_json::from_str::<SessionIn>(&line) {
+            Ok(s) => sessions.push(s),
+            Err(e) => die(format!("corpus line is not a session object: {e}")),
+        }
+    }
+    let t_all = std::time::Instant::now();
+    let (mut msgs_total, mut sessions_done) = (0usize, 0usize);
+    let mut first_id_min = i64::MAX;
+    for s in &sessions {
+        let sid = s.session_id.clone();
+        let src = s.source.clone();
+        let model = s.model.clone();
+        let msgs: Vec<AppendMessage> = s
+            .messages
+            .iter()
+            .map(|m| AppendMessage {
+                role: m.role.clone(),
+                content: m.content.clone(),
+                timestamp: m.timestamp,
+                token_count: m.token_count,
+                tool_name: m.tool_name.clone(),
+                ..Default::default()
+            })
+            .collect();
+        if let Some(started) = s.started_at {
+            // started_at is upstream NOT NULL; the shim has no setter for it
+            // on ensure_session, so a consumer cannot control it (probe P-9).
+            let _ = started;
+        }
+        let batch = mode == "batch";
+        let res: Result<(usize, i64), String> = store
+            .write(Patience::TRANSCRIPT, &mut |txn: &mut dyn WriteTxn| {
+                txn.ensure_session(&sid, &src, model.as_deref())?;
+                if batch {
+                    let rep = txn.append_messages_batch(&sid, &msgs)?;
+                    Ok((rep.appended, rep.first_id))
+                } else {
+                    let mut first = -1i64;
+                    for m in &msgs {
+                        let id = txn.append_message(&sid, m)?;
+                        if first < 0 {
+                            first = id;
+                        }
+                    }
+                    Ok((msgs.len(), first))
+                }
+            })
+            .map_err(|e| format!("write {sid}: {e}"));
+        match res {
+            Ok((n, first)) => {
+                msgs_total += n;
+                sessions_done += 1;
+                first_id_min = first_id_min.min(if first < 0 { 0 } else { first });
+            }
+            Err(e) => die(e),
+        }
+        if !s.usage.is_empty() {
+            let deltas: Vec<ModelUsageDelta> = s
+                .usage
+                .iter()
+                .map(|u| ModelUsageDelta {
+                    model: u.model.clone(),
+                    billing_provider: u.billing_provider.clone(),
+                    billing_base_url: u.billing_base_url.clone(),
+                    billing_mode: u.billing_mode.clone(),
+                    task: u.task.clone(),
+                    api_call_count: u.api_call_count,
+                    input_tokens: u.input_tokens,
+                    output_tokens: u.output_tokens,
+                    cache_read_tokens: u.cache_read_tokens,
+                    cache_write_tokens: u.cache_write_tokens,
+                    reasoning_tokens: u.reasoning_tokens,
+                    estimated_cost_usd: u.estimated_cost_usd,
+                    cost_status: None,
+                    cost_source: None,
+                })
+                .collect();
+            let r: Result<(), String> = store
+                .write(Patience::WRITE, &mut |txn: &mut dyn WriteTxn| {
+                    for d in &deltas {
+                        txn.record_model_usage(&sid, d)?;
+                    }
+                    Ok(())
+                })
+                .map_err(|e| format!("usage {sid}: {e}"));
+            if let Err(e) = r {
+                die(e);
+            }
+        }
+        if let Some(reason) = &s.end_reason {
+            let r: Result<(), String> = store
+                .write(Patience::WRITE, &mut |txn: &mut dyn WriteTxn| {
+                    let _ = txn.end_session(&sid, reason)?;
+                    Ok(())
+                })
+                .map_err(|e| format!("end {sid}: {e}"));
+            if let Err(e) = r {
+                die(e);
+            }
+        }
+    }
+    let wall = t_all.elapsed().as_secs_f64();
+    let rate = if wall > 0.0 {
+        msgs_total as f64 / wall
+    } else {
+        0.0
+    };
+    println!(
+        "import mode={mode} sessions={sessions_done} messages={msgs_total} wall_s={wall:.3} msg_per_s={rate:.1} first_id_min={first_id_min}"
+    );
+    let mut st = store;
+    st.close().unwrap_or_else(|e| die(format!("close: {e}")));
+}
+
+fn cmd_search(db: &str, query: &str, limit: usize) {
+    let (store, open_line) = open_rw(db);
+    println!("{open_line}");
+    let q = query.to_string();
+    let t = std::time::Instant::now();
+    let hits = store
+        .read(&mut |txn: &mut dyn ReadTxn| {
+            txn.search_messages(&q, limit, 0)
+        })
+        .unwrap_or_else(|e| die(format!("search: {e}")));
+    let el = t.elapsed().as_secs_f64();
+    println!("query={query:?} hits={} wall_s={el:.6}", hits.len());
+    for h in hits.iter().take(limit) {
+        let snip: String = h.snippet.chars().take(90).collect();
+        println!(
+            "  hit id={} session={} role={} rank={:.4} snippet={:?}",
+            h.message_id, h.session_id, h.role, h.rank, snip
+        );
+    }
+}
+
+fn cmd_session(db: &str, sid: &str) {
+    let (store, open_line) = open_rw(db);
+    println!("{open_line}");
+    let s = sid.to_string();
+    let got = store
+        .read(&mut |txn: &mut dyn ReadTxn| txn.get_session(&s))
+        .unwrap_or_else(|e| die(format!("get_session: {e}")));
+    match got {
+        None => println!("session {sid}: NOT FOUND"),
+        Some(s) => println!(
+            "session {} source={} model={:?} message_count={} tool_call_count={} api_call_count={} in={} out={} cache_read={} cache_write={} reasoning={} est_cost={:?} started_at={} ended_at={:?} end_reason={:?}",
+            s.id, s.source, s.model, s.message_count, s.tool_call_count, s.api_call_count,
+            s.input_tokens, s.output_tokens, s.cache_read_tokens, s.cache_write_tokens,
+            s.reasoning_tokens, s.estimated_cost_usd, s.started_at, s.ended_at, s.end_reason
+        ),
+    }
+    let n = store
+        .read(&mut |txn: &mut dyn ReadTxn| txn.get_messages(&sid.to_string(), true, true, None, 0))
+        .unwrap_or_else(|e| die(format!("get_messages: {e}")));
+    println!("messages={}", n.len());
+    for m in n.iter().take(3) {
+        let c: String = m.content.clone().unwrap_or_default().chars().take(60).collect();
+        println!(
+            "  msg id={} role={} ts={} uid={:?} active={} compacted={} content={:?}",
+            m.id, m.role, m.timestamp, m.message_uid, m.active, m.compacted, c
+        );
+    }
+}
+
+/// Write a usage delta then immediately read the session projection back.
+/// The question: can a consumer READ the per-model rollup it just wrote,
+/// through the caller-facing API?
+fn cmd_usage_probe(db: &str, sid: &str) {
+    let (store, open_line) = open_rw(db);
+    println!("{open_line}");
+    let s = sid.to_string();
+    let before = store
+        .read(&mut |txn: &mut dyn ReadTxn| txn.get_session(&s))
+        .unwrap_or_else(|e| die(format!("get_session: {e}")));
+    let d = ModelUsageDelta {
+        model: "probe/model".into(),
+        billing_provider: "probe".into(),
+        billing_base_url: "https://example.invalid".into(),
+        billing_mode: "payg".into(),
+        task: "chat".into(),
+        api_call_count: 2,
+        input_tokens: 111,
+        output_tokens: 222,
+        cache_read_tokens: 3,
+        cache_write_tokens: 4,
+        reasoning_tokens: 5,
+        estimated_cost_usd: 0.0123,
+        cost_status: Some("estimated".into()),
+        cost_source: Some("probe".into()),
+    };
+    let r: Result<(), String> = store
+        .write(Patience::WRITE, &mut |txn: &mut dyn WriteTxn| {
+            txn.record_model_usage(&s, &d)?;
+            Ok(())
+        })
+        .map_err(|e| format!("record_model_usage: {e}"));
+    if let Err(e) = r {
+        die(e);
+    }
+    let after = store
+        .read(&mut |txn: &mut dyn ReadTxn| txn.get_session(&s))
+        .unwrap_or_else(|e| die(format!("get_session: {e}")));
+    println!("before_usage_write: {:?}", before.as_ref().map(|x| (x.input_tokens, x.output_tokens, x.api_call_count, x.estimated_cost_usd)));
+    println!("after_usage_write:  {:?}", after.as_ref().map(|x| (x.input_tokens, x.output_tokens, x.api_call_count, x.estimated_cost_usd)));
+    println!("read_back_through_api: none (no ReadTxn method returns session_model_usage rows)");
+    let mut st = store;
+    st.close().unwrap_or_else(|e| die(format!("close: {e}")));
+}
+
+fn cmd_backup(db: &str, dest: &str) {
+    let (store, open_line) = open_rw(db);
+    println!("{open_line}");
+    match store.backup(std::path::Path::new(dest)) {
+        Ok(()) => println!("backup ok -> {dest}"),
+        Err(e) => println!("backup FAILED -> {dest}: {e}"),
+    }
+    // second call to the same destination, on purpose: does it still refuse?
+    match store.backup(std::path::Path::new(dest)) {
+        Ok(()) => println!("second backup to the same dest: ok (overwrite accepted)"),
+        Err(e) => println!("second backup to the same dest: FAILED: {e}"),
+    }
+    let mut st = store;
+    st.close().unwrap_or_else(|e| die(format!("close: {e}")));
+}
+
+fn main() {
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() < 2 {
+        eprintln!("usage: hrspack <import|search|session|usage-probe|backup> ...");
+        std::process::exit(2);
+    }
+    let mut out = std::io::stdout();
+    match args[1].as_str() {
+        "import" => {
+            // import <corpus.jsonl> <store.db> [batch|single]
+            if args.len() < 4 {
+                die("import needs <corpus.jsonl> <store.db> [batch|single]".into());
+            }
+            let mode = args.get(4).map(|s| s.as_str()).unwrap_or("batch");
+            cmd_import(&args[2], &args[3], mode);
+        }
+        "search" => {
+            if args.len() < 4 {
+                die("search needs <store.db> <query> [limit]".into());
+            }
+            let limit: usize = args.get(4).and_then(|s| s.parse().ok()).unwrap_or(10);
+            cmd_search(&args[2], &args[3], limit);
+        }
+        "session" => {
+            if args.len() < 4 {
+                die("session needs <store.db> <session_id>".into());
+            }
+            cmd_session(&args[2], &args[3]);
+        }
+        "usage-probe" => {
+            if args.len() < 4 {
+                die("usage-probe needs <store.db> <session_id>".into());
+            }
+            cmd_usage_probe(&args[2], &args[3]);
+        }
+        "backup" => {
+            if args.len() < 4 {
+                die("backup needs <store.db> <dest.db>".into());
+            }
+            cmd_backup(&args[2], &args[3]);
+        }
+        other => die(format!("unknown command {other:?}")),
+    }
+    let _ = out.flush();
+}

@@ -143,3 +143,91 @@ test 25 s) on a shared 16-core box at load ~25.
 | `params.log` | missing params fail closed; wrong-typed `create` silently defaults |
 | `bunker-*.log`, `bunker-install-leg.out` | the documented fresh-install path, timed, with the 5 failures |
 | `control-host-cargo-test.log` | 29/29 green at the same commit on a host that has the CLI |
+
+---
+
+# Addendum — dogfood run 3 (2026-10-20, HEAD `7331204`): the slice as a Rust library, from an archive importer's seat
+
+Run 2 drove the Python boundary; this run wrote a **Rust consumer outside the repo**
+(`hrspack`, source in `docs/evidence/dogfood-20261020/`) and used the library the way a
+user would: pack 200 Hermes-shaped sessions (4,000 messages) into a state.db-compatible
+archive, search it, record usage, snapshot it. Full report:
+`docs/dogfood/2026-10-20-run3-integration.md`.
+
+## 1. What the slice does now (verified, not claimed)
+
+The eight defects run 2 filed (`DF-HRS-104..111`) are closed, and this run re-proved every
+fix from the consumer side: word-class search (`notes` 610/610, `brand` 658/658), specials
+and paths (`src/main.rs` 854/854, `state.db` 979/979, `C++`, `O'Brien`), a fresh store that
+reports `created_new_store=true degraded=[]`, `backup` overwriting an existing destination,
+a suite that skips (with a recorded reason) instead of failing when the `sqlite3` CLI is
+absent, and a tree that stays clean after `cargo test`. Content fidelity is byte-exact:
+4,000/4,000 messages round-tripped through the Rust writer and were read back with the
+system sqlite3 (a different SQLite build) — CJK, emoji, accents and punctuation included.
+The wiring is real end to end: the file the Rust consumer wrote is read by the stdio
+adapter with the same counts and snippets.
+
+## 2. The lesson this run adds: the shim is a *live session* API, not an *archive* API
+
+`ensure_session(session_id, source, model)` has no timestamp parameter on either surface,
+so every imported session is stamped with the import wall-clock: the corpus said
+`started_at=1760900000`, the store answered `1792510163.87`. A session's `started_at` can
+therefore come out **later than the timestamps of its own messages**, and since upstream's
+time-window routes bound `sessions.started_at` (spec §2.3/§2.4), any date-filtered query
+over an archive is meaningless. The same shape shows up one table over:
+`record_model_usage` writes the per-model rollup and folds it into the session projection,
+but no `ReadTxn` method and no adapter method returns the rollup — the repo's own test reads
+it with raw `rusqlite` SQL. Neither is a crash; both are the boundary of what the slice
+claims, and neither was documented anywhere a consumer would look. Filed as `DF-HRS-115`.
+
+## 3. Two artifact-hygiene defects found while using the thing
+
+- The adapter's `open` validates its flags with `as_bool()` + a default of `false`
+  (`src/bin/session_adapter.rs:502-515`), so `create: "yes"` / `create: 1` are treated as
+  absent (the user sees only `Io … unable to open database file`) and `read_only: "true"`
+  is treated as **false** — the store opens read-write. Run 2 recorded the `create` half in
+  `params.log` but never filed it; the `read_only` half is new. `DF-HRS-114`.
+- The skip log (`$CARGO_TARGET_DIR/hrs010-skipped-tests.log`) held 5 records in 4 lines:
+  `writeln!` through an `OpenOptions::append` handle is not one atomic write, so two test
+  threads interleaved mid-record (`…verification)SKIPPED: f9_…`). `DF-HRS-116`.
+- Not the archive tool's fault, but found while validating this run's own work: the
+  project's `events.jsonl` (the board's event log next to `tasks.jsonl`) carries a **fused
+  record** at line 22 (two JSON values on one physical line, 475 trailing bytes), which
+  makes `boardctl validate -C .` answer `RESULT: FAIL (1 error(s), 18 warning(s))` on the
+  committed blob. It also makes the board's own writer unusable: `boardctl event` printed
+  the same error and appended nothing, so the measurement event this run intended to attach
+  to `DF-HRS-112` (see §4) could not be filed and lives in this document instead.
+  `DF-HRS-117`.
+
+## 4. Performance is measured, not asserted — and no PERF row is justified
+
+Cold build of a consumer from scratch: **83 s** (rusqlite `bundled`). Cold store creation
+(full upstream DDL + FTS scaffold): 1.19–1.40 s clean, 3.0–4.4 s under load. Warm open of a
+4,000-message store: 0.06 s clean. Import of 4,000 messages: 4.5–17.3 s, with **user CPU
+1.0–1.3 s** in every run (≈0.3 ms/message — the wall time is commit I/O, not the store's
+compute). End-to-end CLI search: 127–169 ms wall, 6–18 ms user, with the in-process query
+at 1.3–14.5 ms. Nothing a user would feel, so no `PERF-<n>` row: the honest statement is
+that the wall numbers swing up to 4× with host load (load 9–23 on 16 cores, plus a
+concurrent fresh-build battery on a bunker agent), and the CPU column is the stable signal.
+One measured correction to the batch story: at the Rust API level with one transaction per
+session, `append_messages_batch` and a loop of `append_message` are indistinguishable — the
+batch surface's value is eliminating per-message **round trips on the wire** (the 11.7× in
+`docs/evidence/hrs109/batch-2000-wire.log`), not per-message cost inside a transaction.
+Attached as an event on `DF-HRS-112`, not as a new row.
+
+## 5. Evidence map (this run)
+
+| file | what it proves |
+|---|---|
+| `../dogfood-20261020/01-cold-build.log` | a real consumer's cold build: 83 s from an empty target dir |
+| `../dogfood-20261020/02-import-both-modes.log` | 4,000 messages × 3 runs per mode, one txn per session, with user/sys split |
+| `../dogfood-20261020/04-verify-stores.log` | independent system-sqlite3 read-back: integrity ok, schema 31, 4,000/4,000 byte-identical, uid/timestamp shape |
+| `../dogfood-20261020/06-search-fidelity.log` | 20 probes vs a corpus-derived token oracle: 19 exact, 1 explained (FTS prefix) |
+| `../dogfood-20261020/07-open-cold-warm.log` | cold scaffold vs warm open timings |
+| `../dogfood-20261020/08-usage-readback.log` | the usage delta folded into the session projection; rollup readable only via raw SQL |
+| `../dogfood-20261020/09-backup.log` | `backup` to the same destination twice — DF-HRS-108 re-proof |
+| `../dogfood-20261020/10-adapter-create-typing.log` | `create`/`read_only` as bool / string / number / null |
+| `../dogfood-20261020/11-cross-surface-read.log` | the Rust-written store read back through the stdio adapter |
+| `../dogfood-20261020/12-shutdown.log` | adapter lifecycle close: no reply frame, exit 0 |
+| `../dogfood-20261020/13-search-timings.log` | `hyperfine` end-to-end search, 10 runs per probe |
+| `../dogfood-20261020/README.md` | index + how to regenerate all of it (`run_evidence.sh.txt`) |

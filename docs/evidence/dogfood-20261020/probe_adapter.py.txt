@@ -1,0 +1,68 @@
+#!/usr/bin/env python3
+"""Adapter probe (consumer POV): does `open` validate its `create` parameter?
+
+Drives the built adapter over stdio exactly as the docs describe, once per
+variant, and reports the reply for each. A wrong-typed `create` (string "yes",
+number 1) that is silently treated as absent is a fail-silent input bug: the
+user gets "unable to open database file" with no hint about the real cause.
+
+Usage: python3 probe_adapter.py <adapter-binary> <scratch-dir>
+"""
+import json
+import os
+import subprocess
+import sys
+
+
+def call(binary, frames):
+    p = subprocess.Popen(
+        [binary], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE, text=True, bufsize=1,
+    )
+    out, err = [], ""
+    try:
+        for f in frames:
+            p.stdin.write(json.dumps(f) + "\n")
+            p.stdin.flush()
+            line = p.stdout.readline()
+            out.append(line.strip() or "<no reply / process died>")
+            if p.poll() is not None:
+                break
+        try:
+            p.stdin.write(json.dumps({"id": 99, "method": "shutdown"}) + "\n")
+            p.stdin.flush()
+            p.stdout.readline()
+        except Exception:
+            pass
+    finally:
+        try:
+            p.wait(timeout=10)
+        except Exception:
+            p.kill()
+        err = p.stderr.read() or ""
+    return out, err, p.returncode
+
+
+def main():
+    binary, scratch = sys.argv[1], sys.argv[2]
+    os.makedirs(scratch, exist_ok=True)
+    variants = [
+        ("no create at all", {"path": f"{scratch}/a.db"}),
+        ("create: true", {"path": f"{scratch}/b.db", "create": True}),
+        ('create: "yes" (string)', {"path": f"{scratch}/c.db", "create": "yes"}),
+        ("create: 1 (number)", {"path": f"{scratch}/d.db", "create": 1}),
+        ("create: null", {"path": f"{scratch}/e.db", "create": None}),
+        ('read_only: "true" (string)', {"path": f"{scratch}/f.db", "read_only": "true", "create": True}),
+    ]
+    print(f"adapter: {binary}")
+    for name, params in variants:
+        frames = [{"id": 1, "method": "hello"}, {"id": 2, "method": "open", "params": params}]
+        out, err, rc = call(binary, frames)
+        created = os.path.exists(params["path"])
+        print(f"\n--- {name} ---")
+        print(f"  reply: {out[-1][:220]}")
+        print(f"  file created: {created}  process rc: {rc}  stderr: {err.strip()[:120]!r}")
+
+
+if __name__ == "__main__":
+    main()
