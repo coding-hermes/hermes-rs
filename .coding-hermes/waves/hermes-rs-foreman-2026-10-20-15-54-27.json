@@ -1,0 +1,67 @@
+{
+  "tick": "hermes-rs-foreman-2026-10-20-15-54-27",
+  "project": "hermes-rs",
+  "repo": "/home/kara/hermes-rs",
+  "mode": "wave",
+  "wave_budget": 12,
+  "wave_size": 4,
+  "created_at": "2026-10-20T16:05:00Z",
+  "base_ref": "origin/main",
+  "base_sha": "4c56327",
+  "serial_fallback": false,
+  "selection": "All four rows are implementation rows with empty depends_on (verified in .coding-hermes/board/tasks.jsonl) and disjoint file scopes: 114 = src/bin/session_adapter.rs + specs/python-interop.md + a new tests/ file; 116 = tests/hrs010_session_store.rs + tests/hrs105_search_fidelity.rs; 113 = scripts/check_skill_claims.py + scripts/fixtures/ + .github/workflows/ci.yml; 115 = specs/persistence-shim.md + skills/hermes-rs-usage/SKILL.md + scripts/check-project-artifacts.py. DF-HRS-117 was handled foreman-direct before the wave (board repair, boardctl could not append while the fused line existed); NEVER-DONE is a perpetual audit fixture and is never dispatchable.",
+  "workers": [
+    {
+      "task_id": "DF-HRS-113",
+      "title": "usage-skill claim guard wired into CI",
+      "worktree": "/home/kara/worktrees/hermes-rs-DF-HRS-113",
+      "branch": "wt/DF-HRS-113",
+      "model": "glm-5.3-flash",
+      "provider": "zai-glm",
+      "brief": "/tmp/hrs-brief-DF-HRS-113.txt",
+      "status": "dispatched"
+    },
+    {
+      "task_id": "DF-HRS-114",
+      "title": "adapter open() must not silently ignore wrong-typed create/read_only",
+      "worktree": "/home/kara/worktrees/hermes-rs-DF-HRS-114",
+      "branch": "wt/DF-HRS-114",
+      "model": "glm-5.3-flash",
+      "provider": "zai-glm",
+      "brief": "/tmp/hrs-brief-DF-HRS-114.txt",
+      "status": "dispatched"
+    },
+    {
+      "task_id": "DF-HRS-115",
+      "title": "document the two archive-import contract gaps",
+      "worktree": "/home/kara/worktrees/hermes-rs-DF-HRS-115",
+      "branch": "wt/DF-HRS-115",
+      "model": "glm-5.3-flash",
+      "provider": "opencode-go-2",
+      "brief": "/tmp/hrs-brief-DF-HRS-115.txt",
+      "status": "dispatched"
+    },
+    {
+      "task_id": "DF-HRS-116",
+      "title": "skip-log record must be one atomic line",
+      "worktree": "/home/kara/worktrees/hermes-rs-DF-HRS-116",
+      "branch": "wt/DF-HRS-116",
+      "model": "glm-5.3-flash",
+      "provider": "opencode-go-2",
+      "brief": "/tmp/hrs-brief-DF-HRS-116.txt",
+      "status": "dispatched"
+    }
+  ],
+  "foreman_direct": [
+    {
+      "task_id": "DF-HRS-117",
+      "what": "split the fused events.jsonl line 22 (board repair)",
+      "commit": "4c56327"
+    },
+    {
+      "task_id": "DF-HRS-113",
+      "what": "prose half only: the run-3 usage-skill refresh landed in b71fa5f; the guard is the worker's half",
+      "commit": "b71fa5f"
+    }
+  ]
+}
