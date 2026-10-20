@@ -477,6 +477,43 @@ fn missing_param(key: &str) -> Dispatch {
     }))
 }
 
+/// Human name for a JSON value's type, used in wrong-typed-parameter
+/// errors ("params.create must be a JSON boolean; got string").
+fn json_type_name(v: &serde_json::Value) -> &'static str {
+    match v {
+        serde_json::Value::Null => "null",
+        serde_json::Value::Bool(_) => "boolean",
+        serde_json::Value::Number(_) => "number",
+        serde_json::Value::String(_) => "string",
+        serde_json::Value::Array(_) => "array",
+        serde_json::Value::Object(_) => "object",
+    }
+}
+
+/// A JSON boolean parameter. Absent or explicit `null` is the documented
+/// default; `true`/`false` pass through. Any other type is refused with
+/// `InvalidInput` naming the parameter and the accepted type: a wrong-typed
+/// flag must never be silently coerced into a default that changes the open
+/// mode (e.g. `read_only: "true"` yielding a write-capable handle).
+fn bool_param(
+    params: &serde_json::Value,
+    key: &str,
+    default: bool,
+) -> Result<bool, serde_json::Value> {
+    match params.get(key) {
+        None | Some(serde_json::Value::Null) => Ok(default),
+        Some(serde_json::Value::Bool(b)) => Ok(*b),
+        Some(other) => Err(serde_json::json!({
+            "error": "InvalidInput",
+            "cause": "unknown",
+            "detail": format!(
+                "params.{key} must be a JSON boolean; got {}",
+                json_type_name(other)
+            )
+        })),
+    }
+}
+
 fn open_store(
     store: &mut Option<StockSqliteStore>,
     params: &serde_json::Value,
@@ -499,18 +536,13 @@ fn open_store(
             "detail": "params.path (string) is required"
         }));
     };
-    let read_only = params
-        .get("read_only")
-        .and_then(|c| c.as_bool())
-        .unwrap_or(false);
+    let read_only = bool_param(params, "read_only", false)?;
+    let create = bool_param(params, "create", false)?;
     let opts = if read_only {
         OpenOptions::read_only(&path)
     } else {
         let mut o = OpenOptions::read_write(&path);
-        o.create_if_missing = params
-            .get("create")
-            .and_then(|c| c.as_bool())
-            .unwrap_or(false);
+        o.create_if_missing = create;
         o
     };
     match StockSqliteBackend::open(opts) {

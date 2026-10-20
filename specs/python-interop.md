@@ -197,7 +197,7 @@ Request: one JSON object per line, `{"id": <n>, "method": <name>,
 |---|---|---|---|
 | `hello` | — | protocol, `knows_schema_version`, `language`, `boundary` | — |
 | `ping` | — | `{"pong": true}` | — |
-| `open` | `path`, `create`, `read_only` | capabilities + open report (schema versions, degraded list) | `StockSqliteBackend::open` |
+| `open` | `path` (string, required), `create` (bool, default false), `read_only` (bool, default false) | capabilities + open report (schema versions, degraded list) | `StockSqliteBackend::open` |
 | `ensure_session` | `session_id`, `source?`, `model?` | `{"ensured": id}` | §6.1 `ensure_session` |
 | `append_message` | `session_id`, `role?`, `content?`, `tool_calls?`, `tool_call_id?`, `tool_name?` | `{"message_id": rowid}` | §6.1 `append_message` |
 | `append_messages_batch` | `session_id`, `messages` (array of `{role?, content?, tool_calls?, tool_call_id?, tool_name?, timestamp?, token_count?, message_uid?}`) | `{"first_id": rowid, "appended": n}` | §6.1 `append_messages_batch` |
@@ -220,6 +220,18 @@ Error codes crossing the boundary: `Busy`, `LeaseLost`, `Corrupt`,
 lives in `persistence_error_json` (`src/bin/session_adapter.rs`); `cause`
 values follow the upstream cause tuple (`persistence-shim.md` §3.4,
 `hermes_state_errors.py:137-140`).
+
+### 4.1 Boolean `open` parameters are typed, not coerced
+
+`create` and `read_only` accept only a JSON boolean (`true`/`false`). When
+absent — or explicitly `null` — each defaults to `false`; a missing field is
+not a wrong type. Any other JSON type is refused with an `InvalidInput`
+error naming the parameter and the accepted type, e.g.
+`params.create must be a JSON boolean; got string`. Wrong-typed values are
+never silently coerced to the default: a string/number flag cannot flip the
+open mode (no store is created for `create: "yes"`, and `read_only: "true"`
+cannot yield a write-capable handle). The open-mode default path —
+absent/`null`/`true`/`false` — is unchanged.
 
 ## 5. The end-to-end proof
 
