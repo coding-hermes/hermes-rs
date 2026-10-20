@@ -21,5 +21,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate kickoff contracts and board JSONL
         run: python3 scripts/check-project-artifacts.py
+      - name: Check the usage skill's board claims
+        run: python3 scripts/check_skill_claims.py
       - name: Check committed whitespace
         run: git show --check --oneline --no-renames HEAD
