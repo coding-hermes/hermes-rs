@@ -15,8 +15,15 @@ Design (conservative on purpose):
 - claim unit = the SENTENCE containing the citation (markdown is split on
   sentence-ending punctuation; wrapped lines stay inside their sentence);
 - only unambiguous staleness markers count: the words "open", "still", "yet",
-  "workaround(s)" (word-boundary, case-insensitive) and the phrases
-  "do not trust", "until fixed";
+  "workaround(s)" (word-boundary, case-insensitive), the phrases
+  "do not trust", "until fixed", and — added by DF-HRS-113-R2 after run 4
+  taught the complete-row DF-HRS-114 typed-flag fail-open in confident
+  present tense with none of the words above — a narrow present-tense
+  behavior set: "ignore(s)", "is treated as false/absent", "behave(s) as
+  absent", "gets a write-capable". These assert CURRENT defective behavior
+  against a complete row; the past participle "ignored" (as in the corrected
+  skill's "REFUSED, not ignored") does not match, and the closed-context
+  exemption below still wins over every marker;
 - a sentence carrying closed-defect language ("used to", "are/is/were
   (now) closed", "no longer", "do not/don't repeat", "re-proved/re-verified")
   is treated as DESCRIBING history, not asserting staleness, and is exempt —
@@ -99,6 +106,17 @@ MARKER_RES = [
         r"\bworkarounds?\b",
         r"\bdo\s+not\s+trust\b",
         r"\buntil\s+fixed\b",
+        # Present-tense behavior drift (DF-HRS-113-R2): a sentence asserting
+        # CURRENT defective behavior against a row the board marks complete.
+        # Kept narrow (see the module docstring): the present-tense
+        # "ignore"/"ignores" only — the participle "ignored", as in the
+        # corrected skill's "REFUSED, not ignored", does not match — plus the
+        # fixed "is treated as false|absent" / "behave(s) as absent" /
+        # "gets a write-capable" phrasings.
+        r"\bignores?\b",
+        r"\bis\s+treated\s+as\s+(?:false|absent)\b",
+        r"\bbehave[s]?\s+as\s+absent\b",
+        r"\bgets?\s+a\s+write-capable\b",
     )
 ]
 
@@ -389,14 +407,57 @@ def self_test() -> int:
     if not any(v["kind"] == "stale_claim" for v in stale_violations):
         failures.append("stale-claim probe: 'still refuses' must be flagged")
 
+    # 6. Run-4 present-tense control: the committed fixture carrying the
+    #    stale pre-04822cc typed-flag fail-open must FAIL and name
+    #    DF-HRS-114 (the board marks that row complete).
+    run4_path = ROOT / "scripts" / "fixtures" / "skill_claims_run4_present_tense.md"
+    run4_violations, _, _ = check_skill(
+        _read_or_die(run4_path, "fixture"), board, str(run4_path)
+    )
+    run4_rows = sorted({str(v["row_id"]) for v in run4_violations})
+    if run4_rows != ["DF-HRS-114"]:
+        failures.append(
+            "present-tense behavior control: expected a violation for exactly"
+            " [DF-HRS-114], got %s" % run4_rows
+        )
+
+    # 7. The past participle "ignored" is corrected-skill voice, not a
+    #    present-tense behavior claim: it must NOT fire on its own.
+    participle_violations, _, _ = check_skill(
+        "Wrong-typed flags are REFUSED, not ignored (`DF-HRS-104`).",
+        {"DF-HRS-104": "complete"},
+        "synthetic",
+    )
+    if participle_violations:
+        failures.append(
+            "present-tense behavior control: the participle 'not ignored'"
+            " must be suppressed, got: %s" % participle_violations
+        )
+
+    # 8. The new present-tense marker must fire on its own: a sentence with
+    #    none of the pre-existing markers ("open", "still", ...) that asserts
+    #    current defective behavior against a complete row.
+    present_violations, _, _ = check_skill(
+        "Wrong-typed `create` is treated as false (`DF-HRS-114`).",
+        {"DF-HRS-114": "complete"},
+        "synthetic",
+    )
+    if not any(v["kind"] == "stale_claim" for v in present_violations):
+        failures.append(
+            "present-tense behavior control: 'is treated as false' must be"
+            " flagged without any pre-existing marker"
+        )
+
     if failures:
         for failure in failures:
             print("self-test FAIL: %s" % failure, file=sys.stderr)
         return 1
     print(
-        "self-test: 5/5 probes pass (fixture fails on %s; current content"
+        "self-test: 8/8 probes pass (fixture fails on %s; current content"
         " passes; missing-row flagged; history sentence suppressed; stale"
-        " claim flagged)" % ",".join(expected_rows)
+        " claim flagged; present-tense behavior control fails on DF-HRS-114;"
+        " participle 'not ignored' suppressed; 'is treated as false' flagged)"
+        % ",".join(expected_rows)
     )
     return 0
 
