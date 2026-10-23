@@ -166,6 +166,17 @@ class SessionAdapter:
     def get_messages(self, session_id: str, limit: int | None = None) -> dict:
         return self._call("get_messages", {"session_id": session_id, "limit": limit})
 
+    def get_session(self, session_id: str) -> dict | None:
+        """Read one session projection; ``None`` when the id has no row.
+
+        The wire method answers the projection documented in
+        ``specs/python-interop.md`` §4 (id, source, model, counters, timestamps,
+        ``end_reason``, parent/keys) or JSON ``null`` for an unknown session
+        id. A null projection is an ANSWER, not a failure: it lands here as
+        ``None`` instead of raising :class:`AdapterError`.
+        """
+        return self._call("get_session", {"session_id": session_id})
+
     def end_session(self, session_id: str, end_reason: str) -> dict:
         return self._call(
             "end_session", {"session_id": session_id, "end_reason": end_reason}

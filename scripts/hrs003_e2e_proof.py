@@ -174,12 +174,29 @@ def roundtrip_proof(scratch: str, adapter: str) -> None:
             uid_b in c for c in contents2
         ), contents2
         assert got2["messages"][0]["role"] == "user"
-        # session counters survived the round-trip
-        session_row = p2._call("get_session", {"session_id": "20261015_120000_aa0001"})
+        # session counters survived the round-trip. DF-HRS-119: the projection
+        # is read through the PUBLIC client method (never the private `_call`)
+        # and pinned to the message list it counts — a projection whose
+        # message_count disagrees with len(get_messages) is a wire-contract
+        # break, not a cosmetic one.
+        session_row = p2.get_session("20261015_120000_aa0001")
+        assert session_row is not None, "get_session returned null for a live session"
         assert session_row["message_count"] == 7, (
             session_row
         )  # 2 original + 5 batch (DF-HRS-112)
         assert session_row["end_reason"] == "session_reset", session_row
+        assert session_row["message_count"] == len(got2["messages"]), (
+            session_row["message_count"],
+            len(got2["messages"]),
+        )
+        # A missing row is a null projection, not an error (§4).
+        assert p2.get_session("no_such_session_zz") is None, (
+            "get_session for an absent session must answer null/None"
+        )
+        print(
+            f"GET_SESSION_WIRE_OK message_count={session_row['message_count']} "
+            f"== len(get_messages)={len(got2['messages'])}"
+        )
         p2.close_store()
 
     print(
@@ -321,8 +338,13 @@ def batch_usage_wire_proof(adapter: str, n: int = 200) -> None:
         )
         assert usage.get("ok") is True, usage
 
-        row = p._call("get_session", {"session_id": sid})
+        row = p.get_session(sid)
+        assert row is not None, "get_session returned null for a live session"
         assert row["message_count"] == n, row
+        assert row["message_count"] == len(got["messages"]), (
+            row["message_count"],
+            len(got["messages"]),
+        )
         assert row["input_tokens"] == 1000, row
         assert row["output_tokens"] == 200, row
         assert row["api_call_count"] == 3, row
@@ -336,9 +358,19 @@ def batch_usage_wire_proof(adapter: str, n: int = 200) -> None:
         p2.open(db)
         got2 = p2.get_messages(sid)
         assert len(got2["messages"]) == n, len(got2["messages"])
-        row2 = p2._call("get_session", {"session_id": sid})
+        row2 = p2.get_session(sid)
+        assert row2 is not None, "get_session returned null after reopen"
         assert row2["message_count"] == n and row2["input_tokens"] == 1000, row2
+        assert row2["message_count"] == len(got2["messages"]), (
+            row2["message_count"],
+            len(got2["messages"]),
+        )
         p2.close_store()
+
+    print(
+        f"GET_SESSION_BATCH_WIRE_OK message_count={row2['message_count']} "
+        f"== len(get_messages)={len(got2['messages'])}"
+    )
 
     print(
         f"BATCH_WIRE_OK append_messages_batch n={n} first_id={batch['first_id']} "

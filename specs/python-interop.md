@@ -233,6 +233,50 @@ open mode (no store is created for `create: "yes"`, and `read_only: "true"`
 cannot yield a write-capable handle). The open-mode default path —
 absent/`null`/`true`/`false` — is unchanged.
 
+### 4.2 Reference client surface (`scripts/hrs003_client.py`)
+
+`scripts/hrs003_client.py` is the documented stdlib reference client: one
+public `SessionAdapter` method per DATA method of the §4 table, so a consumer
+following this spec never has to build frames by hand or reach for the private
+`_call`. The two handshake/liveness frames are deliberately **protocol-only**:
+`hello` (protocol version, `knows_schema_version`, `language`, the boundary
+statement) and `ping` (`{"pong": true}`) carry no session-store operation and
+are NOT exposed as client methods — a caller that wants liveness or the
+protocol banner speaks that frame directly.
+
+| Wire method (§4) | `SessionAdapter` method |
+|---|---|
+| `hello` | protocol-only |
+| `ping` | protocol-only |
+| `open` | `open` |
+| `ensure_session` | `ensure_session` |
+| `append_message` | `append_message` |
+| `append_messages_batch` | `append_messages_batch` |
+| `record_model_usage` | `record_model_usage` |
+| `get_messages` | `get_messages` |
+| `get_session` | `get_session` |
+| `end_session` | `end_session` |
+| `search` | `search` |
+| `checkpoint` | `checkpoint` |
+| `backup` | `backup` |
+| `close` | `close_store` |
+| `shutdown` | `shutdown` |
+
+`get_session(session_id)` returns the session projection described in §4, or
+`None` when the id has no session row — a null projection is an ANSWER, not an
+`AdapterError`. Teardown names differ from the wire on purpose: `close_store()`
+is the wire `close` (drops the store handle) while the client's own `close()`
+is context-manager cleanup (it shuts the process down).
+
+This manifest is machine-checked, not prose (DF-HRS-119):
+`tests/hrs003_python_interop.rs::hrs003_documented_surface_matches_client`
+parses BOTH the §4 wire table and this table, requires the two method sets to be
+identical, requires `hello`/`ping` to be the only `protocol-only` rows, and
+requires every mapped name to be a callable public attribute of the real
+`SessionAdapter` class (it imports the client module). Adding a §4 method
+without classifying it here, or documenting a method the client does not have,
+fails the suite.
+
 ## 5. The end-to-end proof
 
 ### 5.1 What runs
@@ -250,8 +294,10 @@ no separate runner needed) executes, in one cargo invocation:
      conversion case), reads them back in rowid order;
    - **reopen**: closes the first adapter process (clean `shutdown`), opens
      the SAME file through a SECOND adapter process, re-reads both messages,
-     verifies the session row (`message_count == 2`, `end_reason`), verifies
-     the backup snapshot contains both rows;
+     reads the session projection through the public `get_session(...)` client
+     method and pins `message_count` to `len(get_messages(...)["messages"])`
+     for that same session (plus `end_reason`; an absent id answers `None`),
+     verifies the backup snapshot contains both rows;
    - **independent read-back**: the stdlib `sqlite3` module — a DIFFERENT
      SQLite stack than the one the Rust build links (3.53.1 vs the bundled
      3.53.2 amalgamation) — opens the same file, checks
@@ -265,7 +311,8 @@ no separate runner needed) executes, in one cargo invocation:
      `/proc` scan, self-match-safe) and zero `-wal`/`-shm` sidecars after
      the final clean close;
    - the driver prints machine-checkable markers (`ROUNDTRIP_OK`, `BATCH_WIRE_OK`,
-     `MODEL_USAGE_WIRE_OK`, `SQLITE3_REOPEN_OK`, `SQLITE_SCHEMA_VERSION=31`,
+     `MODEL_USAGE_WIRE_OK`, `GET_SESSION_WIRE_OK`,
+     `GET_SESSION_BATCH_WIRE_OK`, `SQLITE3_REOPEN_OK`, `SQLITE_SCHEMA_VERSION=31`,
      `ERROR_STRUCTURED`, `LIFECYCLE_CLEAN`, `HRS112_WIRE_CLEAN`) and the Rust
      test asserts every marker — exit 0
      alone would not be evidence. Since DF-HRS-112 the default proof also
@@ -289,6 +336,15 @@ no separate runner needed) executes, in one cargo invocation:
    `BROKEN_CASE_VERIFIED` and the structured error class — i.e. the broken
    case demonstrably FAILED with the right error, and the failure is
    checked into the repo.
+6. **`hrs003_documented_surface_matches_client`** — the documented-surface
+   guard (§4.2): parses the §4 wire table and the §4.2 client-surface
+   manifest, requires the two method sets to be identical, requires
+   `hello`/`ping` to be the ONLY `protocol-only` rows (a data method cannot
+   be waved through as protocol-only), and requires every mapped name to be
+   a callable public attribute of the real `SessionAdapter` class by
+   importing the client module. A documented method the client is missing
+   fails the battery instead of surfacing as an `AttributeError` for a
+   consumer.
 
 ### 5.2 Environment of the recorded run
 
@@ -355,7 +411,7 @@ python3 scripts/hrs003_e2e_proof.py --mode broken --out docs/evidence/hrs003/bro
     --adapter <path-to-hermes-rs-session-adapter>
 ```
 
-Expected: all five interop tests pass; the driver prints the five markers of
+Expected: all six interop tests pass; the driver prints the markers of
 §5.1; the broken-case transcript ends `BROKEN_CASE_VERIFIED`.
 
 ## References

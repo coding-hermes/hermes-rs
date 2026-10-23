@@ -109,10 +109,14 @@ workarounds. What is still true:
   `snippet` wraps the matched term in `>>>…<<<`. There is no `content` field — a client that
   reads `hit["content"]` renders every hit blank (run 4's first probe bug). `rank` is BM25
   (lower/more negative = better match) and results arrive in rank order.
-- **The reference client is one method short of the wire table.** `scripts/hrs003_client.py`
-  has no `get_session` (nor `hello` / `ping`), although `specs/python-interop.md` §4 lists
-  them. `session.get_session(sid)` raises `AttributeError`; call the wire directly —
-  `client._call("get_session", {"session_id": sid})` — and see `DF-HRS-119`.
+- **`get_session` is public on the reference client.** `session.get_session(sid)` answers the
+  projection `specs/python-interop.md` §4 documents (counters, timestamps, `end_reason`), and
+  `None` when the id has no row — a null projection is an answer, not an `AdapterError`.
+  `DF-HRS-119` closed the earlier gap where the method existed on the wire only; §4.2 now maps
+  every data method onto a client method and `tests/hrs003_python_interop.rs` machine-checks
+  that mapping (wire table ↔ §4.2 manifest ↔ callable `SessionAdapter` attribute). `hello` /
+  `ping` stay protocol-only by design: speak the frame if you need the protocol banner or a
+  liveness probe. Never reach for `_call(...)` for a documented method (§4.2 is exhaustive).
 - **Unknown method / malformed frame kill the process** (exit 6 / exit 4, by design). A
   client must `poll()` before writing or it dies with a broken pipe; §4 lists `ProcessDead`
   as a client-side code for exactly this.
