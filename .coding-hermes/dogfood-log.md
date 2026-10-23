@@ -190,11 +190,37 @@
 - Verdict: PROMISING-BUT-ROUGH (engine SHIPPABLE at this scale; delivery surface rough).
 - Artifacts: docs/dogfood/2026-10-23-run4-integration.md; docs/dogfood/diagnostics.md
   ("Run 4" section); docs/evidence/dogfood-20261023/ (3 ndjson captures, install cells
-  TSV+JSONL, time -v log, 3 re-runnable probe scripts).
+  TSV+JSONL, time -v log, 3 probe scripts — two of which reproduce end-to-end from the
+  committed blob; see the second-fire addendum below).
 - Docs gap unchanged from run 3: no docs/qa/use-cases.md catalog and no
   run-history.jsonl, so this log stays the single canonical history by repo convention.
 - Board hygiene at close: boardctl validate OK with 23 warnings (the pre-run baseline;
   my three rows added no new warning class — the `acceptance` alias they first carried was
   stripped as non-canon), check_skill_claims.py exit 0 with citations_checked 17,
   check-project-artifacts.py "valid: 31 board rows".
+- Second fire of the same tick (resumed delivery, same label `…-19-00-13`, commit 62ed136
+  above already landed and pushed): this fire did NOT re-drive the legs. It verified the
+  landed state — HEAD 62ed136 == origin/main (0 unpushed), rows DF-HRS-113-R2 / 118 / 119
+  present exactly once in the committed blob and absent as duplicates, `boardctl validate`
+  OK/23 warnings, `check_skill_claims.py` rc=0 — and re-derived three of the delivery's
+  claims from the artifacts instead of the prose: archive.db + copy-of-archive.db
+  `integrity_check=ok` with 60000/300/60000 rows re-read through the host sqlite3 3.53.4;
+  `"connection pool"` re-driven through the reference client against the control store
+  (returns the row whose words are SEPARATED — quotes really do mean AND, matching the
+  corrected skill bullet); and the three committed probe scripts re-run from
+  `git show HEAD:…` copies. Delta found by that last arm (the one thing the first fire's
+  probe design could not see, because it never re-ran its own committed artifact):
+  `run_user_flow.py.txt` stops at its counter stage with `AttributeError: … no attribute
+  'get_session'` — i.e. the same client gap DF-HRS-119 already owns, now reproduced from
+  the committed blob; `tail_stages.py` (counters/backup/reopen/multiword) and
+  `probe_open_flags.py` (5/5 arms identical to flags.ndjson) reproduce clean. Attached as
+  audit EVENT 376 on DF-HRS-119 rather than as a sibling row, and the two doc sentences
+  that claimed all three probes were "re-runnable as written" were corrected in place.
+  Scale check from the re-run (400 messages): open_cold 1.091 s, import 0.306 s =
+  0.766 ms/message, search p50 0.16 ms / p95 0.35 ms — no superlinear behaviour between
+  400 and 60,000 messages, so the no-PERF-row verdict stands. Install leg NOT re-spawned
+  (same HEAD f7fba49, unchanged install docs: a second spawn would measure the host, not
+  the product); the first fire's agent bf15df01 was already destroyed (bunker census 0,
+  re-checked this fire). Scratch used: /tmp/hrs-rerun-check-4b (re-run copies),
+  /tmp/hrs-ctl-probe-4b (boardctl scratch-board probe); no residue in the repo.
 

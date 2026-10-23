@@ -308,4 +308,4 @@ earlier runs).
 | `../dogfood-20261023/flags.ndjson` | the five `open` boolean-typing arms (two wrong-typed, three controls) |
 | `../dogfood-20261023/install-cells.tsv` | every install-battery cell with its verdict and detail |
 | `../dogfood-20261023/install-cells.jsonl` | the raw battery evidence rows |
-| `../dogfood-20261023/*.py.txt` | the three probes, re-runnable as written |
+| `../dogfood-20261023/*.py.txt` | the three probes, re-run from the COMMITTED blob on the tick's second fire (event 376): `tail_stages.py` and `probe_open_flags.py` reproduce end-to-end (the latter 5/5 arms identical), while `run_user_flow.py` stops at its counter stage with the `DF-HRS-119` `AttributeError` until the client gains `get_session` |
