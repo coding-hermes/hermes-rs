@@ -231,3 +231,81 @@ Attached as an event on `DF-HRS-112`, not as a new row.
 | `../dogfood-20261020/12-shutdown.log` | adapter lifecycle close: no reply frame, exit 0 |
 | `../dogfood-20261020/13-search-timings.log` | `hyperfine` end-to-end search, 10 runs per probe |
 | `../dogfood-20261020/README.md` | index + how to regenerate all of it (`run_evidence.sh.txt`) |
+
+---
+
+# Run 4 (2026-10-23) — scale, the wire client, and a guard that cannot see behaviour claims
+
+## 1. What this run added
+
+Run 3 proved the slice on a 4,000-message corpus and on the Rust API. Run 4 drove the
+**documented Python boundary** with a 60,000-message archive across 300 sessions, and
+re-checked the project's own coaching against HEAD. Everything below is from captured
+output in `../evidence/dogfood-20261023/`.
+
+## 2. How the numbers were produced (so they can be re-run)
+
+`run_user_flow.py.txt` imports the repo's own `scripts/hrs003_client.py` — nothing private —
+generates a deterministic corpus (seed `20261023`), plants each of ten "needle" strings in
+exactly four messages, and grades search against those known slots instead of against the
+product's answer. `tail_stages.py.txt` re-opens the store the first script left behind, so the
+reopen number is a genuinely cold process. `probe_open_flags.py.txt` speaks raw frames.
+
+Two probe-harness bugs of my own, fixed before their results were used, worth recording
+because each one *looks* like a product defect:
+
+1. I read search hits as `h["content"]`. The wire returns `snippet` (with `>>>match<<<`
+   highlighting), so every hit looked empty. Inspecting one raw frame showed the real
+   shape; nothing was filed. Read one frame before writing a parser.
+2. The documented reference client has **no `get_session`** even though
+   `specs/python-interop.md` §4 lists it, so my first run died with `AttributeError`
+   halfway through — that became `DF-HRS-119`, but only after confirming the method exists
+   on the wire (`a._call("get_session", …)` answered) and is merely missing from the client.
+
+## 3. Why the skill drift happened, mechanically
+
+`scripts/check_skill_claims.py` (the DF-HRS-113 guard) walks every `DF-HRS-<n>` citation in
+`skills/hermes-rs-usage/SKILL.md`, resolves its row status, and fails only when the claim
+sentence matches a **staleness marker**: `open`, `still`, `yet`, `workaround(s)`,
+`do not trust`, `until fixed`. Its own docstring says a claim carrying none of those
+markers is let through — "the guard does not guess semantics".
+
+The stale sentence at HEAD was:
+
+> **The adapter's `open` ignores wrong-typed flags.** … `create: "yes"` / `1` behave as
+> absent → `Io: unable to open database file` with no hint, and `read_only: "true"` is
+> treated as **false** … (`DF-HRS-114`).
+
+No marker word appears; the row it cites is `complete`; the sentence is a confident
+present-tense assertion about current behaviour. So the guard passed (`rc=0`) while the
+prose described the pre-`04822cc` code. The timing is the tell: the skill was rewritten at
+11:15 on 2026-10-20, the adapter fix landed at 11:29 — **fourteen minutes later** — and
+nothing re-read the prose.
+
+The lesson for this repo: a doc guard that models drift as *row status vocabulary* cannot
+see drift as *behaviour*. A claim that names a closed row and states what the code does
+should be graded by a probe (or by a marker vocabulary that includes present-tense
+behaviour verbs like "ignores", "treated as", "behave as"), not only by "open/still/yet".
+
+## 4. Install leg (fresh machine, this run)
+
+`bunker-qa.sh launch` → `bf15df01` on `bunker-mvp`, QA HEAD `f7fba49`, 24 rows collected,
+agent destroyed. Cells: `fresh-install` OK (dev build 18.09 s on a bare agent), `ci-pass`
+OK (act, 1 job green), `chaos-resource` PASS at a 3 GB cap. `upgrade` N/A (no release
+tags). `chaos-corruption` **N/A with the reason "no db/state files in repo"** — a
+detection bug in the battery for a project whose product *is* a SQLite store created at
+runtime; the cell therefore never exercises corruption. Harness class, recorded, not filed
+against the product. `chaos-disconnect` UNVERIFIED (empty `disc.log`, unchanged from
+earlier runs).
+
+## 5. Evidence map (run 4)
+
+| file | what it proves |
+|---|---|
+| `../dogfood-20261023/runA.ndjson` | corpus size, cold create/open, import throughput + 0 errors, 10 needle searches, 50-sample warm latency |
+| `../dogfood-20261023/runA.time.log` | process wall/CPU/RSS for the whole import leg (`time -v`) |
+| `../dogfood-20261023/tail.ndjson` | counters vs actual rows, 59 MB backup time/size, cold reopen of a new process, warm p50/max, `get_messages`, multi-word query semantics on a known control store |
+| `../dogfood-20261023/flags.ndjson` | the five `open` boolean-typing arms (two wrong-typed, three controls) |
+| `../dogfood-20261023/install-cells.tsv` | every install-battery cell with its verdict and detail |
+| `../dogfood-20261023/install-cells.jsonl` | the raw battery evidence rows |
+| `../dogfood-20261023/*.py.txt` | the three probes, re-runnable as written |

@@ -1,0 +1,212 @@
+#!/usr/bin/env python3
+"""Real-user dogfood: keep a two-year agent-session archive in one store and
+answer questions about it, through the DOCUMENTED stdlib Python boundary.
+
+Scenario (a real user, not a test): I have N sessions of agent transcripts.
+I want to (1) import them, (2) search them by phrase/keyword, (3) know they
+survived a restart, and (4) hand a copy to someone.
+
+Ground truth is generated here, so results are graded against the corpus the
+script itself wrote -- not against the product's own answer.
+
+Usage: run_user_flow.py <adapter_bin> <workdir> [--sessions N] [--msgs M]
+Prints one JSON object per stage to stdout (ndjson) and writes summary.json.
+"""
+from __future__ import annotations
+
+import json
+import os
+import random
+import statistics
+import subprocess
+import sys
+import time
+
+sys.path.insert(0, os.path.join(os.environ.get("HERMES_RS_ROOT", "."), "scripts"))
+
+# The documented reference client (stdlib only).
+from hrs003_client import AdapterError, SessionAdapter  # noqa: E402
+
+VOCAB = (
+    "gateway session store message transcript search index token pipeline "
+    "worker board foreman scheduler batch import archive sqlite wal backup "
+    "connection pool retry timeout provider router model lane budget tokenizer "
+    "boardctl gitreins duckdb parquet checkpoint replica shard lease lock query "
+    "schema migration column index trigger transaction commit rollback cursor "
+    "vector embedding recall memory ledger cron watchdog daemon socket stream "
+    "buffer flush fsync compress block page cache vacuum analyze planner cost "
+    "rowid btree trigram prefix suffix matcher ranking bm25 score hit offset"
+).split()
+
+# Things a real user actually types into a search box.
+NEEDLES = [
+    "connection pool",          # two-word phrase
+    "bulk-import",              # hyphenated compound
+    "/var/tmp/hermes-cargo-target",  # a path
+    "DF-HRS-114",               # an id with digits/hyphen
+    "wal_generation_lost",      # snake_case identifier
+    "O'Brien",                  # apostrophe
+    "cache_read_tokens",        # snake_case column
+    "parquet",                  # plain single word
+    "4096d",                    # digit+letter token
+    "scheduler.db",             # dotted filename
+]
+
+
+def gen_corpus(sessions: int, msgs: int, seed: int = 20261023):
+    """Return list of {session_id, messages:[{role,content}]} plus needle map."""
+    rnd = random.Random(seed)
+    corpus = []
+    # Plant each needle in exactly `plant` messages, spread across sessions.
+    needle_slots = {}
+    for n in NEEDLES:
+        needle_slots[n] = set()
+    total = sessions * msgs
+    for i, n in enumerate(NEEDLES):
+        # deterministic, distinct slot per needle
+        for k in range(4):
+            needle_slots[n].add((i * 977 + k * 3001) % total)
+
+    flat = 0
+    for s in range(sessions):
+        sid = f"sess-{2024 + s // 200}-{s:04d}"
+        msgs_out = []
+        for m in range(msgs):
+            role = "user" if m % 2 == 0 else "assistant"
+            words = [rnd.choice(VOCAB) for _ in range(rnd.randint(12, 28))]
+            planted = [n for n, slots in needle_slots.items() if flat in slots]
+            if planted:
+                words.insert(rnd.randint(0, len(words)), rnd.choice(planted))
+            content = " ".join(words) + "."
+            if m % 7 == 0:
+                content += f" ref {rnd.randint(100, 999)}"
+            msgs_out.append({"role": role, "content": content})
+            flat += 1
+        corpus.append({"session_id": sid, "messages": msgs_out})
+    return corpus
+
+
+def main() -> int:
+    adapter = sys.argv[1]
+    work = sys.argv[2]
+    sessions = int(sys.argv[sys.argv.index("--sessions") + 1]) if "--sessions" in sys.argv else 300
+    msgs = int(sys.argv[sys.argv.index("--msgs") + 1]) if "--msgs" in sys.argv else 200
+    os.makedirs(work, exist_ok=True)
+    db = os.path.join(work, "archive.db")
+    out = []
+
+    def emit(stage, **kv):
+        rec = {"stage": stage, **kv}
+        out.append(rec)
+        print(json.dumps(rec), flush=True)
+
+    # ---- stage 1: user imports the archive in one process ------------------
+    corpus = gen_corpus(sessions, msgs)
+    total_msgs = sum(len(c["messages"]) for c in corpus)
+    gen_path = os.path.join(work, "corpus.json")
+    with open(gen_path, "w") as f:
+        json.dump(corpus, f)
+    emit("corpus", sessions=len(corpus), messages=total_msgs,
+         bytes=os.path.getsize(gen_path))
+
+    t0 = time.monotonic()
+    a = SessionAdapter(adapter)
+    rep = a.open(db, create=True)
+    t_open = time.monotonic() - t0
+    emit("open_cold", seconds=round(t_open, 3),
+         created_new_store=rep.created_new_store,
+         schema_before=rep.schema_version_before,
+         schema_after=rep.schema_version_after,
+         degraded=rep.degraded)
+
+    t0 = time.monotonic()
+    errors = []
+    for c in corpus:
+        try:
+            a.ensure_session(c["session_id"], "dogfood", "glm-5.3-flash")
+            a.append_messages_batch(c["session_id"], c["messages"])
+        except AdapterError as e:
+            errors.append({"session": c["session_id"], "error": str(e)})
+    t_import = time.monotonic() - t0
+    emit("import", seconds=round(t_import, 3), messages=total_msgs,
+         ms_per_msg=round(t_import * 1000 / total_msgs, 3),
+         errors=errors[:5], error_count=len(errors))
+
+    # ---- stage 2: the user searches (the headline operation) --------------
+    searches = {}
+    for n in NEEDLES:
+        t0 = time.monotonic()
+        try:
+            hits = a.search(n, 20)["hits"]
+            searches[n] = {"n": len(hits), "s": round(time.monotonic() - t0, 4),
+                           "top": [h.get("content", "")[:60] for h in hits[:2]]}
+        except AdapterError as e:
+            searches[n] = {"error": str(e)}
+    emit("search_needles", results=searches)
+
+    # warm latency over a fixed query set (10 reps of 5 queries)
+    warm = []
+    for _ in range(10):
+        for q in ("connection pool", "parquet", "wal_generation_lost",
+                  "scheduler.db", "cache_read_tokens"):
+            t0 = time.monotonic()
+            a.search(q, 20)
+            warm.append(time.monotonic() - t0)
+    warm.sort()
+    emit("search_latency", n=len(warm),
+         p50_ms=round(statistics.median(warm) * 1000, 2),
+         p95_ms=round(warm[int(len(warm) * 0.95)] * 1000, 2),
+         max_ms=round(max(warm) * 1000, 2))
+
+    # ---- stage 3: counters vs reality -------------------------------------
+    probes = []
+    for sid in (corpus[0]["session_id"], corpus[len(corpus) // 2]["session_id"],
+                corpus[-1]["session_id"]):
+        try:
+            ses = a.get_session(sid)
+            got = a.get_messages(sid, limit=10_000)["messages"]
+            probes.append({"session": sid,
+                           "projection_message_count": ses.get("message_count") if ses else None,
+                           "actual_rows": len(got),
+                           "projection": {k: v for k, v in (ses or {}).items()
+                                          if k in ("message_count", "status", "source", "model",
+                                                   "started_at", "ended_at")}})
+        except AdapterError as e:
+            probes.append({"session": sid, "error": str(e)})
+    emit("counters", probes=probes)
+
+    # ---- stage 4: hand a copy to someone (backup) + clean shutdown --------
+    bkp = os.path.join(work, "archive-copy.db")
+    t0 = time.monotonic()
+    a.backup(bkp)
+    emit("backup", seconds=round(time.monotonic() - t0, 3),
+         bytes=os.path.getsize(bkp) if os.path.exists(bkp) else None)
+    t0 = time.monotonic()
+    a.shutdown()
+    emit("shutdown", seconds=round(time.monotonic() - t0, 3))
+
+    # ---- stage 5: reopen from a NEW process (cold) ------------------------
+    t0 = time.monotonic()
+    b = SessionAdapter(adapter)
+    rep2 = b.open(db)
+    t_reopen = time.monotonic() - t0
+    t0 = time.monotonic()
+    again = b.search("connection pool", 20)["hits"]
+    t_first_warm_search = time.monotonic() - t0
+    t0 = time.monotonic()
+    b.search("connection pool", 20)
+    t_second = time.monotonic() - t0
+    emit("reopen", seconds=round(t_reopen, 3),
+         created_new_store=rep2.created_new_store, degraded=rep2.degraded,
+         first_search_ms=round(t_first_warm_search * 1000, 2),
+         second_search_ms=round(t_second * 1000, 2),
+         hits_before=len(again))
+    b.shutdown()
+
+    with open(os.path.join(work, "summary.json"), "w") as f:
+        json.dump(out, f, indent=1)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,5 @@
+{"stage": "corpus", "sessions": 300, "messages": 60000, "bytes": 10889974}
+{"stage": "open_cold", "seconds": 1.589, "created_new_store": true, "schema_before": null, "schema_after": 31, "degraded": []}
+{"stage": "import", "seconds": 18.854, "messages": 60000, "ms_per_msg": 0.314, "errors": [], "error_count": 0}
+{"stage": "search_needles", "results": {"connection pool": {"n": 20, "s": 0.0049, "top": ["", ""]}, "bulk-import": {"n": 4, "s": 0.0004, "top": ["", ""]}, "/var/tmp/hermes-cargo-target": {"n": 4, "s": 0.0003, "top": ["", ""]}, "DF-HRS-114": {"n": 4, "s": 0.0003, "top": ["", ""]}, "wal_generation_lost": {"n": 4, "s": 0.0003, "top": ["", ""]}, "O'Brien": {"n": 4, "s": 0.0002, "top": ["", ""]}, "cache_read_tokens": {"n": 4, "s": 0.0003, "top": ["", ""]}, "parquet": {"n": 20, "s": 0.0087, "top": ["", ""]}, "4096d": {"n": 4, "s": 0.0004, "top": ["", ""]}, "scheduler.db": {"n": 4, "s": 0.0003, "top": ["", ""]}}}
+{"stage": "search_latency", "n": 50, "p50_ms": 0.4, "p95_ms": 9.73, "max_ms": 10.15}

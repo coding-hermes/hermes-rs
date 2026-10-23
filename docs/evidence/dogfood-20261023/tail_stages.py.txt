@@ -1,0 +1,108 @@
+#!/usr/bin/env python3
+"""Tail stages on the archive the import leg already wrote (no re-import):
+counters-vs-reality, backup, cold reopen of a 59MB / 60k-message store, and
+the multi-word query-semantics control on a tiny store.
+"""
+import json
+import os
+import statistics
+import sys
+import time
+
+sys.path.insert(0, os.path.join(os.environ.get("HERMES_RS_ROOT", "."), "scripts"))
+from hrs003_client import SessionAdapter  # noqa: E402
+
+ADAPTER = sys.argv[1]
+WORK = sys.argv[2]
+db = os.path.join(WORK, "archive.db")
+
+
+def emit(**kv):
+    print(json.dumps(kv), flush=True)
+
+
+# ---------- 1. counters vs reality (read side, raw wire call) ---------------
+t0 = time.monotonic()
+a = SessionAdapter(ADAPTER)
+rep = a.open(db)
+t_cold_open = time.monotonic() - t0
+emit(stage="open_warm_existing", seconds=round(t_cold_open, 3),
+     created_new_store=rep.created_new_store, degraded=rep.degraded)
+
+probes = []
+for sid in ("sess-2024-0000", "sess-2024-0150", "sess-2025-0299"):
+    ses = a._call("get_session", {"session_id": sid})
+    msgs = a.get_messages(sid, limit=100000)["messages"]
+    proj = ses or {}
+    probes.append({
+        "session": sid,
+        "projection_keys": sorted(proj.keys()) if isinstance(proj, dict) else proj,
+        "projection_message_count": proj.get("message_count") if isinstance(proj, dict) else None,
+        "actual_rows": len(msgs),
+        "status": proj.get("status") if isinstance(proj, dict) else None,
+        "started_at": proj.get("started_at") if isinstance(proj, dict) else None,
+        "first_msg_ts": msgs[0].get("timestamp") if msgs else None,
+    })
+emit(stage="counters", probes=probes)
+
+# ---------- 2. backup of a live 59MB store --------------------------------
+bkp = os.path.join(WORK, "copy-of-archive.db")
+try:
+    os.unlink(bkp)
+except FileNotFoundError:
+    pass
+t0 = time.monotonic()
+a.backup(bkp)
+emit(stage="backup", seconds=round(time.monotonic() - t0, 3),
+     src_bytes=os.path.getsize(db), dst_bytes=os.path.getsize(bkp))
+a.shutdown()
+
+# ---------- 3. cold reopen from a NEW process + first-search latency ------
+t0 = time.monotonic()
+b = SessionAdapter(ADAPTER)
+rep2 = b.open(db)
+t_reopen = time.monotonic() - t0
+t0 = time.monotonic()
+h1 = b.search("4096d", 20)["hits"]
+t_first = time.monotonic() - t0
+warm = []
+for _ in range(20):
+    t0 = time.monotonic()
+    b.search("4096d", 20)
+    warm.append(time.monotonic() - t0)
+t0 = time.monotonic()
+b.get_messages("sess-2024-0000", limit=100000)
+t_get_messages = time.monotonic() - t0
+emit(stage="reopen", seconds=round(t_reopen, 3),
+     created_new_store=rep2.created_new_store, degraded=rep2.degraded,
+     hits=len(h1), first_search_ms=round(t_first * 1000, 2),
+     warm_p50_ms=round(statistics.median(warm) * 1000, 2),
+     warm_max_ms=round(max(warm) * 1000, 2),
+     get_messages_200_ms=round(t_get_messages * 1000, 2))
+b.shutdown()
+
+# ---------- 4. multi-word query semantics control ------------------------
+tiny = os.path.join(WORK, "tiny.db")
+for s in ("", "-wal", "-shm"):
+    try:
+        os.unlink(tiny + s)
+    except FileNotFoundError:
+        pass
+c = SessionAdapter(ADAPTER)
+c.open(tiny, create=True)
+c.ensure_session("t1", "probe")
+c.append_message("t1", "user", "the pool is warm")
+c.append_message("t1", "user", "a connection dropped")
+c.append_message("t1", "user", "one connection pool limit is set")
+c.append_message("t1", "user", "connection ... pool separated by other words entirely")
+res = {}
+for q in ("connection pool", "connection AND pool", "connection OR pool",
+          '"connection pool"', "pool connection", "connect*"):
+    try:
+        hits = c.search(q, 20)["hits"]
+        res[q] = {"n": len(hits),
+                  "ids": sorted(h["message_id"] for h in hits)}
+    except Exception as e:  # noqa: BLE001
+        res[q] = {"error": str(e)[:200]}
+emit(stage="multiword_semantics", results=res)
+c.shutdown()

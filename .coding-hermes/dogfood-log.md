@@ -135,3 +135,62 @@
   and probe sources + run_evidence.sh to regenerate), skills/hermes-rs-usage/SKILL.md
   (traps rewritten to verified state).
 - Addendum: the DF-HRS-112 measurement event could not be attached — `boardctl event` REFUSES to write while events.jsonl line 22 stays fused (it printed the fused-line error and appended nothing, so events.jsonl was unchanged at 41 lines). The measurement therefore lives in docs/dogfood/diagnostics.md §4 and in docs/evidence/dogfood-20261020/02-import-both-modes.log; filed as DF-HRS-117.
+
+## 2026-10-23 dogfood tick (run 4)
+- HEAD: f7fba49 (main, clean tree, origin/main in sync). Tick label
+  `hermes-rs-dogfood-2026-10-23-19-00-13`. Fresh angle vs runs 1-3: the documented
+  Python boundary driven with a REALISTIC archive (300 sessions x 200 messages =
+  60,000 messages) instead of repo fixtures.
+- Real-use pass: a stdlib-only consumer (docs/evidence/dogfood-20261023/run_user_flow.py.txt)
+  importing the repo's own scripts/hrs003_client.py. Cold create+open 1.589 s
+  (created_new_store=true, degraded=[]); import 18.854 s = 0.314 ms/message, 0 errors;
+  process cost wall 21.14 s / user CPU 0.60 s / max RSS 43 MB; 10 user queries all found
+  their planted targets; warm search p50 0.4 ms (p95 9.7 ms) on the importing process and
+  **p50 0.14 ms, max 0.39 ms** after a cold reopen from a NEW process (0.151 s to reopen
+  a 59 MB store); get_messages 200 rows 1.72 ms; backup 59 MB in 1.845 s.
+- Trust: `pragma integrity_check` ok on the archive AND its backup read with the host
+  sqlite3 3.53.4 (a different build than the crate's bundled one); messages 60000 /
+  sessions 300 / fts rows 60000, no orphans; session projections agree with actual rows
+  (200/200 on 3 sampled sessions, started_at within ~20 ms of the first message); clean
+  shutdown, no residue locks, reopen answers. Nothing lost or corrupted.
+- Search semantics (new, measured on a known control store): multi-word = AND,
+  `AND`/`OR` accepted, word order irrelevant, **quotes do NOT mean phrase** (a message
+  with other words between the two matched a quoted pair), trailing `*` = prefix. Hits are
+  `{message_id, rank, role, session_id, snippet}` with the match wrapped in `>>>…<<<` —
+  there is no `content` field.
+- Install leg: bunker-qa.sh launch -> agent bf15df01 on bunker-mvp, QA HEAD f7fba49
+  (ff-only pull ok), collect -> 24 rows, agent DESTROYED (bunker list census: 0). Cells:
+  fresh-install OK (dev build 18.09 s on a bare agent), ci-pass OK (act 1 job green),
+  chaos-resource PASS at a 3 GB cap; upgrade N/A (no release tags); docker/ui/
+  chaos-shutdown N/A; chaos-disconnect UNVERIFIED (empty disc.log, harness class,
+  unchanged); chaos-corruption N/A because the battery claims "no db/state files in repo"
+  — wrong for a project whose product IS a SQLite store created at runtime, so that cell
+  never runs (harness blind spot, recorded in diagnostics, not filed against the product).
+- Findings filed (3): DF-HRS-113-R2 (recurrence) the DF-HRS-113 guard grades staleness
+  VOCABULARY (open/still/yet/workaround), so a confident present-tense behaviour claim
+  against a complete row passes CI — it did: the usage skill still taught the
+  pre-`04822cc` typed-flag fail-open, and reachability was 14 minutes (skill rewritten
+  11:15, fix landed 11:29 on 2026-10-20); repo prose corrected this run, guard coverage
+  is the remaining work. DF-HRS-118 README Status says "only a buildable crate scaffold"
+  while HEAD ships a 4,931-line persistence engine, two binaries, a documented wire
+  protocol, 12 integration tests and the specs/evidence trees — the real entry points are
+  undiscoverable from the file every visitor reads. DF-HRS-119 the reference client lacks
+  `get_session` (in the §4 wire table): a user following the docs gets AttributeError.
+- Also corrected in this run (knowledge left behind): skills/hermes-rs-usage/SKILL.md —
+  the stale typed-flag trap replaced with the verified InvalidInput behaviour, plus the
+  new search-semantics and hit-shape bullets and the client-gap escape hatch.
+- Step 2b (perf): no PERF row. At 60k messages every user-facing operation is
+  sub-millisecond except the one-shot import (19 s for two years, 0.31 ms/message) and
+  first-ever store creation (1.59 s, once) — nothing a user would feel. CPU split
+  confirms import cost is commit I/O (user 0.60 s of 18.85 s wall).
+- Verdict: PROMISING-BUT-ROUGH (engine SHIPPABLE at this scale; delivery surface rough).
+- Artifacts: docs/dogfood/2026-10-23-run4-integration.md; docs/dogfood/diagnostics.md
+  ("Run 4" section); docs/evidence/dogfood-20261023/ (3 ndjson captures, install cells
+  TSV+JSONL, time -v log, 3 re-runnable probe scripts).
+- Docs gap unchanged from run 3: no docs/qa/use-cases.md catalog and no
+  run-history.jsonl, so this log stays the single canonical history by repo convention.
+- Board hygiene at close: boardctl validate OK with 23 warnings (the pre-run baseline;
+  my three rows added no new warning class — the `acceptance` alias they first carried was
+  stripped as non-canon), check_skill_claims.py exit 0 with citations_checked 17,
+  check-project-artifacts.py "valid: 31 board rows".
+

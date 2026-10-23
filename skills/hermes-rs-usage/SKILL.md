@@ -61,17 +61,21 @@ process boundary, deliberately not an embed).
 
 ## Traps
 
-Re-verified from a real Rust consumer at `7331204` (run 3, 2026-10-20 —
-`docs/dogfood/2026-10-20-run3-integration.md`, evidence in
-`docs/evidence/dogfood-20261020/`). The eight defects this section used to list as OPEN
+Re-verified by real use at `f7fba49` (run 4, 2026-10-23 — a 60,000-message archive
+through this Python boundary: `docs/dogfood/2026-10-23-run4-integration.md`, evidence in
+`docs/evidence/dogfood-20261023/`). The eight defects this section used to list as OPEN
 (`DF-HRS-104..111`) are closed and their fixes re-proved live — do NOT repeat the old
 workarounds. What is still true:
 
-- **The adapter's `open` ignores wrong-typed flags.** `create` defaults to false and only a
-  real JSON `true` counts (`create: "yes"` / `1` behave as absent → `Io: unable to open
-  database file` with no hint), and `read_only: "true"` is treated as **false**, so a
-  caller who thinks they opened a read-only viewer gets a write-capable handle. State the
-  flags as JSON booleans (`DF-HRS-114`).
+- **Wrong-typed `open` flags are REFUSED, not ignored** (re-proved run 4 at HEAD; the fix
+  is `04822cc`, which landed *after* run 3 wrote this section, `DF-HRS-114`). `create:
+  "yes"` / `create: 1` answer `InvalidInput: params.create must be a JSON boolean; got
+  string|number`, likewise `read_only: "true"` for `params.read_only`; no store is opened
+  and no file is created. Absent or `null` still defaults to `false`, and a real
+  `read_only: true` handle refuses writes with `InvalidInput: read-only store: attempt to
+  write a readonly database`. Pass JSON booleans with their own type — a caller who
+  follows that rule is not silently upgraded to a write-capable handle any more.
+
 - **A fresh store now reports honestly**: `created_new_store: true` on creation and
   `degraded: []` (the census is clean). You may branch on both — the old "always false /
   always degraded" coaching is gone (`DF-HRS-106`, `DF-HRS-107`).
@@ -95,6 +99,20 @@ workarounds. What is still true:
   `fts_cjk=false`, and a trailing `*` is passed to FTS as a **prefix** query (so `state*`
   also returns `states`, `statement`…). A zero-result search for a token that is present is
   no longer expected — verify against a LIKE query before blaming the sanitizer.
+- **Multiple words mean AND; `AND` / `OR` work; quotes do NOT mean phrase.** Measured on a
+  control store with known contents (run 4): `connection pool` returns the rows holding
+  *both* tokens, `connection OR pool` returns either, word order does not matter, and
+  `"connection pool"` behaves exactly like the unquoted pair — a message with other words
+  *between* the two matched. So a caller who quotes to get an exact phrase gets loose
+  results. `state*` (trailing `*`) is the only proximity-free trick documented here.
+- **Hits are display-ready**: each is `{message_id, rank, role, session_id, snippet}` where
+  `snippet` wraps the matched term in `>>>…<<<`. There is no `content` field — a client that
+  reads `hit["content"]` renders every hit blank (run 4's first probe bug). `rank` is BM25
+  (lower/more negative = better match) and results arrive in rank order.
+- **The reference client is one method short of the wire table.** `scripts/hrs003_client.py`
+  has no `get_session` (nor `hello` / `ping`), although `specs/python-interop.md` §4 lists
+  them. `session.get_session(sid)` raises `AttributeError`; call the wire directly —
+  `client._call("get_session", {"session_id": sid})` — and see `DF-HRS-119`.
 - **Unknown method / malformed frame kill the process** (exit 6 / exit 4, by design). A
   client must `poll()` before writing or it dies with a broken pipe; §4 lists `ProcessDead`
   as a client-side code for exactly this.

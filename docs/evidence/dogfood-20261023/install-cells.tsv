@@ -1,0 +1,24 @@
+repo-head	OK	tested HEAD=f7fba490b4c09e75c92d187ca751b1095b183efb at launch=2026-10-23T19:10:55Z (pull=ff-only ok)
+launch	OK	agent=bf15df01 server=bunker-mvp ttl=4h script_bytes=135531 — battery started detached (qa-run.sh); phase B: bunker-qa.sh collect --evidence /tmp/bunker-qa-evidence-20261023T191022Z-2023669.jsonl
+repo-head	OK	tested HEAD=f7fba490b4c09e75c92d187ca751b1095b183efb (pull: ff-only ok)
+toolchain-bootstrap	OK	go 1.27.3 installed (~/tools/go; floor=none distro=1.27.3)
+toolchain-bootstrap	OK	rust stable installed (~/tools/cargo + ~/tools/rustup)
+toolchain-bootstrap	OK	system gcc/g++ toolchain (~/tools/bin wrappers -> gcc/g++) — preferred over zig-cc for C++ cgo deps (MCP-008)
+toolchain-bootstrap	OK	make available (preinstalled) — GNU Make 4.3
+toolchain-bootstrap	INFO	bare agent missing system deps: openssl(libssl-dev) — rust build cells graded ENV-BLOCKED when they fail on these (no sudo to apt install)
+fresh-install	OK	    Finished `dev` profile [unoptimized + debuginfo] target(s) in 18.09s
+toolchain-bootstrap	OK	compose plugin installed (~/.docker/cli-plugins/docker-compose)
+toolchain-bootstrap	OK	buildx plugin installed (github.com/docker/buildx v0.38.1 0dbe87f36ed472fe36b6796c3f70b4210a731fc5)
+toolchain-bootstrap	OK	node+npm installed (v22.15.0)
+toolchain-bootstrap	OK	HARNESS-COMPOSE=ok (docker compose version passes)
+toolchain-bootstrap	OK	HARNESS_NODE=ok (node v22.15.0, npm 10.9.2)
+ci-pass	OK	act: 1 jobs green — rc=0 (1 triggerable workflow(s))
+upgrade	N/A	no release tags in repo
+docker-deploy	N/A	no compose file
+ui-probe	N/A	no web UI detected: no npm dev/start script (package.json or frontend/package.json) and no go.mod HTTP server source
+chaos-disconnect	UNVERIFIED	disc.log is EMPTY (0 bytes) or never-ran (no-test-path marker) -- the suite produced NO output, so the network cut was NEVER exercised; rc=0 is not a disconnect result (QA-WARPFS-17; QA-BUNKER-29 vacuity class)
+chaos-shutdown	N/A	no compose file
+chaos-corruption	N/A	no db/state files in repo
+chaos-resource	PASS	suite survives 3G memory cap (cap=3145728KB child_saw=3145728 subshell_saw=3145728 parent_saw=unlimited)
+chaos-errorpath	INFO	no start command detected / entrypoint not observable — missing-config behavior UNVERIFIED
+collect	OK	agent=bf15df01 (bunker-mvp) — pulled 21 evidence row(s), merge-deduped by ts; temp agent destroyed
