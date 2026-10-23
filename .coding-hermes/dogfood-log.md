@@ -151,8 +151,12 @@
 - Trust: `pragma integrity_check` ok on the archive AND its backup read with the host
   sqlite3 3.53.4 (a different build than the crate's bundled one); messages 60000 /
   sessions 300 / fts rows 60000, no orphans; session projections agree with actual rows
-  (200/200 on 3 sampled sessions, started_at within ~20 ms of the first message); clean
-  shutdown, no residue locks, reopen answers. Nothing lost or corrupted.
+  (200/200 on 3 sampled sessions, started_at within ~20 ms of the first message); shutdown
+  accepted and a NEW process reopened the same file and answered a search (the durability
+  check); the `-wal` left beside the store is 0 bytes. Nothing lost or corrupted. (Correction
+  after the fact: the `-wal`/`-shm` files inspected at 14:16 were re-created by the host
+  sqlite3 integrity read that followed the adapter's 14:11 shutdown, so the file set AT
+  shutdown was not captured and is not claimed.)
 - Search semantics (new, measured on a known control store): multi-word = AND,
   `AND`/`OR` accepted, word order irrelevant, **quotes do NOT mean phrase** (a message
   with other words between the two matched a quoted pair), trailing `*` = prefix. Hits are

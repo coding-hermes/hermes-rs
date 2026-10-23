@@ -80,8 +80,12 @@ highlighted as `>>>term<<<` — i.e. the surface is display-ready:
   no orphan FTS rows.
 - Counters agree with reality on sampled sessions (200/200) — the projection is not
   drifting from the message rows.
-- The process exits clean on `shutdown` with no leftover `-wal`/`-shm` (verified by a
-  fresh process reopening the same file and answering a search).
+- The adapter answers `shutdown`, and a **new process** reopens the same file and answers a
+  search (that is the real durability check, and it passed). The `-wal` beside the store is
+  **0 bytes** — nothing uncommitted was pending. Correction, so this is not overstated: the
+  `-wal`/`-shm` files present at inspection (mtime 14:16) were created by the host `sqlite3`
+  integrity read that ran *after* the adapter's shutdown (14:11), so this run did **not**
+  capture the file set at the instant of shutdown and makes no claim about it.
 - Backup destination is a complete, independently openable copy (same size, integrity ok,
   60000 rows readable).
 
