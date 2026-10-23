@@ -223,4 +223,3 @@
   the product); the first fire's agent bf15df01 was already destroyed (bunker census 0,
   re-checked this fire). Scratch used: /tmp/hrs-rerun-check-4b (re-run copies),
   /tmp/hrs-ctl-probe-4b (boardctl scratch-board probe); no residue in the repo.
-
