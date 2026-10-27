@@ -232,3 +232,53 @@
 - Findings filed: DF-HRS-120 (corruption detector misses runtime-created state.db and reports N/A) and DF-HRS-121 (error-path detector leaves documented binaries/stdio negative behavior unverified). These are harness coverage gaps, not product defect claims.
 - Verdict: PROMISING-BUT-ROUGH; the persistence slice delivered its documented workflow, while fresh-machine corruption and negative-path coverage remain unproven.
 - Artifacts: docs/dogfood/2026-10-27-run5-integration.md; docs/dogfood/diagnostics.md; skills/hermes-rs-usage/SKILL.md; docs/evidence/dogfood-20261027/.
+
+## 2026-10-27 dogfood tick (run 5) — resumed-delivery addendum (second fire of the same label)
+- Resumed fire of `hermes-rs-dogfood-2026-10-27-21-01-36` (same tick label) found the first
+  delivery's write-back LANDED at 21:18:27Z as commit `d708903`: rows DF-HRS-120 + DF-HRS-121
+  (each exactly once in the COMMITTED blob, `git show HEAD:.coding-hermes/board/tasks.jsonl`),
+  `docs/dogfood/2026-10-27-run5-integration.md`, `docs/dogfood/diagnostics.md`,
+  `skills/hermes-rs-usage/SKILL.md` and `docs/evidence/dogfood-20261027/` (build.log, e2e.log,
+  e2e-warm.log, bunker-evidence.jsonl, chaos-disconnect.log, bunker-ci.log). Those legs were
+  VERIFIED, not re-driven.
+- Legs this fire genuinely completed: (1) `d708903` was UNPUSHED (origin/main `9e23afd`, HEAD
+  `d708903`, 1 ahead) — pushed, origin parity restored; (2) the namespace carried no run record
+  for this run (`GET /api/memories?namespace=hermes-rs` shows `/dogfood/2026-10-17/run2` and
+  `/dogfood/2026-10-23/run4` only) — `/dogfood/2026-10-27/run5` written and read back.
+- Install-leg evidence re-derived from the COMMITTED `docs/evidence/dogfood-20261027/bunker-evidence.jsonl`:
+  repo-head OK `9e23afd`, fresh-install OK (build-only, rc=0 dev profile), ci-pass OK (act 1 job
+  green), chaos-disconnect INFO with `NETWORK_CUT_APPLIED` suite `52 0`, chaos-resource PASS
+  (cap 3145728KB), chaos-corruption N/A `no db/state files in repo`, chaos-errorpath INFO
+  `no start command detected`. Teardown claim holds: `bunker info 68817f50` -> `not_found`,
+  `bunker list --status all` -> only the pre-existing `crier-lab`.
+- Step 2b re-measurement — the first entry's cold 9.10 s / warm 5.46 s pair does NOT reproduce as a
+  cold/warm split on this host. `python3 scripts/hrs003_e2e_proof.py --adapter <debug adapter>` at
+  the same built HEAD ran 5x: 8.49, 13.99, 5.42, 5.28, 6.09 s wall, all rc=0 with identical OK
+  markers, user CPU 0.23-0.33 s. The spread tracks host contention (loadavg 10.4->16.6; sibling
+  `hermes-canopy` tsc/vitest lanes; 8.3-9.2 s device-busy per run per `/proc/diskstats`), so the
+  seconds are process startup + fsync under load, not product work. Honest number: ~5.3-6.1 s
+  warm for the whole proof with 0.3 s user CPU. No PERF row — nothing a user would feel.
+- Protocol / negative re-probe at HEAD (same built adapter): `--protocol` -> `hermes-rs/session-adapter/1`
+  rc=0; unknown method -> `fail-closed exit 6`; `open` with `create:"yes"` -> `InvalidInput`
+  `params.create must be a JSON boolean; got string` rc=0. The usage skill's typed-flag and
+  fail-closed bullets still hold at HEAD.
+- Wire-surface census (specs/python-interop.md §4 table vs `src/bin/session_adapter.rs` dispatch vs
+  `scripts/hrs003_client.py`): adapter implements hello, ping, open, ensure_session, append_message,
+  get_messages, get_session, end_session, search, append_messages_batch, record_model_usage,
+  checkpoint, backup, close, shutdown; the client exposes one public method per DATA method and
+  leaves hello/ping protocol-only as specified — no gap. `scripts/hrs003_client.py:169 get_session`
+  present (the DF-HRS-119 fix is in this HEAD).
+- Quiescence, three samples over ~3 min (21:19:43, 21:20:28, 21:22:40Z) identical: HEAD `d708903`,
+  1 unpushed, only ` M .coding-hermes/board/events.jsonl`. No writer process in the checkout
+  (`ps -eo pid,etimes,cmd` census). `boardctl validate` -> OK (29 warnings, the pre-run baseline);
+  `scripts/check-project-artifacts.py` -> `valid: 34 board rows`.
+- Working-tree residue left UNTOUCHED by this fire: events 388/389 (task_created for both rows,
+  ts 21:14:58.510/.519Z) sit uncommitted in `.coding-hermes/board/events.jsonl`. Their timestamps
+  match the `tasks.jsonl` append to the millisecond (16:14:58.518 local), so they came from the
+  first delivery's row-filing step — the integration report's sentence attributing that file to
+  "an external worker" is an attribution nit (no action, row-free).
+- Not re-run on purpose: the bunker install leg (HEAD `9e23afd` for every Cargo path; `d708903`
+  touches only board/docs/skill files, so a re-spawn would measure the host, not the product) and
+  the cold detached-worktree build.
+- Verdict unchanged: PROMISING-BUT-ROUGH. The persistence slice delivers its documented workflow;
+  fresh-machine corruption and negative-path coverage remain unproven. No product source changed.
