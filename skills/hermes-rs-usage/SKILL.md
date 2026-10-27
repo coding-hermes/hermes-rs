@@ -61,11 +61,11 @@ process boundary, deliberately not an embed).
 
 ## Traps
 
-Re-verified by real use at `f7fba49` (run 4, 2026-10-23 — a 60,000-message archive
-through this Python boundary: `docs/dogfood/2026-10-23-run4-integration.md`, evidence in
-`docs/evidence/dogfood-20261023/`). The eight defects this section used to list as OPEN
-(`DF-HRS-104..111`) are closed and their fixes re-proved live — do NOT repeat the old
-workarounds. What is still true:
+Re-verified by real use at `f7fba49` (run 4, 2026-10-23 — a 60,000-message
+archive through this Python boundary: `docs/dogfood/2026-10-23-run4-integration.md`,
+evidence in `docs/evidence/dogfood-20261023/`). The eight defects this section used
+to list as OPEN (`DF-HRS-104..111`) are closed and their fixes re-proved live — do
+NOT repeat the old workarounds. What is still true:
 
 - **Wrong-typed `open` flags are REFUSED, not ignored** (re-proved run 4 at HEAD; the fix
   is `04822cc`, which landed *after* run 3 wrote this section, `DF-HRS-114`). `create:
@@ -99,12 +99,12 @@ workarounds. What is still true:
   `fts_cjk=false`, and a trailing `*` is passed to FTS as a **prefix** query (so `state*`
   also returns `states`, `statement`…). A zero-result search for a token that is present is
   no longer expected — verify against a LIKE query before blaming the sanitizer.
-- **Multiple words mean AND; `AND` / `OR` work; quotes do NOT mean phrase.** Measured on a
-  control store with known contents (run 4): `connection pool` returns the rows holding
+- **Multiple words mean AND; `AND` / `OR` work; quotes do NOT mean phrase.** Measured on
+  a control store with known contents (run 4): `connection pool` returns rows holding
   *both* tokens, `connection OR pool` returns either, word order does not matter, and
   `"connection pool"` behaves exactly like the unquoted pair — a message with other words
-  *between* the two matched. So a caller who quotes to get an exact phrase gets loose
-  results. `state*` (trailing `*`) is the only proximity-free trick documented here.
+  *between* the two matched. `state*` (trailing `*`) is the only proximity-free trick
+  documented here.
 - **Hits are display-ready**: each is `{message_id, rank, role, session_id, snippet}` where
   `snippet` wraps the matched term in `>>>…<<<`. There is no `content` field — a client that
   reads `hit["content"]` renders every hit blank (run 4's first probe bug). `rank` is BM25
@@ -117,9 +117,9 @@ workarounds. What is still true:
   that mapping (wire table ↔ §4.2 manifest ↔ callable `SessionAdapter` attribute). `hello` /
   `ping` stay protocol-only by design: speak the frame if you need the protocol banner or a
   liveness probe. Never reach for `_call(...)` for a documented method (§4.2 is exhaustive).
-- **Unknown method / malformed frame kill the process** (exit 6 / exit 4, by design). A
-  client must `poll()` before writing or it dies with a broken pipe; §4 lists `ProcessDead`
-  as a client-side code for exactly this.
+- **Unknown method / malformed frame kill the process** (exit 6 / exit 4, by design). A client
+  must `poll()` before writing or it dies with a broken pipe; §4 lists `ProcessDead` as a
+  client-side code for exactly this.
 - **`shutdown` replies nothing** — it closes silently with exit 0 (`specs/python-interop.md`
   §4's table says "process exits 0"). Do not block waiting for a reply frame there.
 - **`cargo test` without a `sqlite3` CLI**: the suite stays green and 5 tests SKIP with a

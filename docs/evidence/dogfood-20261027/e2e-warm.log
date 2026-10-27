@@ -1,0 +1,15 @@
+BATCH_WIRE_OK first_id=3 appended=5
+MODEL_USAGE_WIRE_OK response={'ok': True}
+GET_SESSION_WIRE_OK message_count=7 == len(get_messages)=7
+ROUNDTRIP_OK create/append/read/reopen verified across two adapter processes
+SQLITE3_REOPEN_OK stdlib sqlite3 read the acknowledged rows; integrity=ok
+SQLITE_SCHEMA_VERSION=31
+ERROR_STRUCTURED bad call -> AdapterError(SessionRowMissing, cause=session_row_missing)
+LIFECYCLE_CLEAN exit-0 shutdown, no orphaned adapter, no WAL/lock leftovers
+GET_SESSION_BATCH_WIRE_OK message_count=200 == len(get_messages)=200
+BATCH_WIRE_OK append_messages_batch n=200 first_id=1 appended=200
+MODEL_USAGE_WIRE_OK record_model_usage -> ok=true, counters verified
+HRS112_WIRE_CLEAN batch + model usage verified across two processes
+real 5.46
+user 0.21
+sys 0.08

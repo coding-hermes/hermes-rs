@@ -1,0 +1,28 @@
+   Compiling find-msvc-tools v0.1.14
+   Compiling shlex v2.0.1
+   Compiling vcpkg v0.2.15
+   Compiling memchr v2.8.3
+   Compiling pkg-config v0.3.34
+   Compiling serde_core v1.0.229
+   Compiling foldhash v0.2.0
+   Compiling zmij v1.0.23
+   Compiling serde_json v1.0.154
+   Compiling regex-syntax v0.8.11
+   Compiling fallible-iterator v0.3.0
+   Compiling bitflags v2.13.2
+   Compiling fallible-streaming-iterator v0.1.9
+   Compiling itoa v1.0.18
+   Compiling smallvec v1.16.3
+   Compiling cc v1.8.0
+   Compiling hashbrown v0.17.1
+   Compiling aho-corasick v1.1.5
+   Compiling hashlink v0.12.2
+   Compiling libsqlite3-sys v0.38.2
+   Compiling regex-automata v0.4.18
+   Compiling regex v1.13.1
+   Compiling rusqlite v0.40.2
+   Compiling hermes-rs v0.1.0 (/home/kara/hermes-rs)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 9.25s
+real 9.29
+user 22.08
+sys 3.40

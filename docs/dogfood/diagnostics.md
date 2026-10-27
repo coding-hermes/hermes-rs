@@ -309,3 +309,19 @@ earlier runs).
 | `../dogfood-20261023/install-cells.tsv` | every install-battery cell with its verdict and detail |
 | `../dogfood-20261023/install-cells.jsonl` | the raw battery evidence rows |
 | `../dogfood-20261023/*.py.txt` | the three probes, re-run from the COMMITTED blob on the tick's second fire (event 376): `tail_stages.py` and `probe_open_flags.py` reproduce end-to-end (the latter 5/5 arms identical), while `run_user_flow.py` stops at its counter stage with the `DF-HRS-119` `AttributeError` until the client gains `get_session` |
+
+# Dogfood diagnostics — hermes-rs
+
+This file records build and integration diagnostics from real-use runs. Product-source fixes belong to the foreman; dogfood runs preserve evidence and file board rows.
+
+## Run 5 (2026-10-27, HEAD 9e23afdf)
+
+The canonical product is `/home/kara/hermes-rs`; the scheduler-provided stand-in path resolves to `/home/kara`, so all product commands were run from a detached worktree of the canonical HEAD. `cargo build --bins` succeeded in 9.29 s wall with an isolated `CARGO_TARGET_DIR`; the documented adapter protocol reports `hermes-rs/session-adapter/1`.
+
+The public stdlib Python client and e2e proof completed twice. The cold proof took 9.10 s wall and the warm repeat 5.46 s. Both verified batch append, model usage, `get_session`/`get_messages` counter parity, cross-process reopen, independent stdlib sqlite3 integrity read-back, schema 31, structured `SessionRowMissing`, and clean adapter shutdown. These timings are not slow enough for a user-facing PERF row.
+
+The fresh-machine `bunker-qa.sh` leg ran on bunker-mvp agent 68817f50 at the same HEAD. The agent was collected and destroyed; post-destroy `bunker info` returned `not_found`, and the server census showed only the pre-existing crier-lab agent. Fresh install finished the dev build in 19.17 s; act CI was one job green; the network-cut suite reported `52 0`; the resource cap cell passed.
+
+Two install-battery detector gaps were filed. DF-HRS-120 covers `chaos-corruption` reporting `N/A: no db/state files in repo`, although the documented product creates runtime SQLite `state.db`. DF-HRS-121 covers `chaos-errorpath` reporting `INFO: no start command detected / entrypoint not observable`, although the project documents two binaries and a stdio protocol. The battery needs project-declared runtime-state and negative-path hooks; neither result is a product defect claim.
+
+Evidence is in `docs/evidence/dogfood-20261027/` and the integration report is `docs/dogfood/2026-10-27-run5-integration.md`.

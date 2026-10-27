@@ -223,3 +223,12 @@
   the product); the first fire's agent bf15df01 was already destroyed (bunker census 0,
   re-checked this fire). Scratch used: /tmp/hrs-rerun-check-4b (re-run copies),
   /tmp/hrs-ctl-probe-4b (boardctl scratch-board probe); no residue in the repo.
+
+## 2026-10-27 dogfood tick (run 5)
+- Tick: hermes-rs-dogfood-2026-10-27-21-01-36; HEAD 9e23afdfb8f4717474e27cc9d80773c01a5084d6, equal to origin/main before write-back.
+- Promise: a user can build the source checkout and drive the stock-SQLite session store through the documented stdlib Python JSON-RPC adapter, persist/reopen/search/read/backup, record usage, and receive structured errors; this is not full Hermes Agent or a published package.
+- Real-use: clean detached worktree `cargo build --bins` rc=0 in 9.29s wall; cold public-client e2e rc=0 in 9.10s and warm repeat rc=0 in 5.46s. Both proved batch append, usage, get_session/message-count parity, cross-process reopen, sqlite3 integrity read-back, schema 31, structured SessionRowMissing, and clean shutdown. Nothing was slow enough for a PERF row.
+- Install: `bunker-qa.sh` on bunker-mvp agent 68817f50 tested the same HEAD. Fresh-install OK (dev build 19.17s), ci-pass OK (one act job), chaos-disconnect INFO with network cut and suite result 52/0, chaos-resource PASS at 3G. Agent evidence/logs were harvested before destroy; post-destroy info returned not_found and the server census showed only pre-existing crier-lab.
+- Findings filed: DF-HRS-120 (corruption detector misses runtime-created state.db and reports N/A) and DF-HRS-121 (error-path detector leaves documented binaries/stdio negative behavior unverified). These are harness coverage gaps, not product defect claims.
+- Verdict: PROMISING-BUT-ROUGH; the persistence slice delivered its documented workflow, while fresh-machine corruption and negative-path coverage remain unproven.
+- Artifacts: docs/dogfood/2026-10-27-run5-integration.md; docs/dogfood/diagnostics.md; skills/hermes-rs-usage/SKILL.md; docs/evidence/dogfood-20261027/.

@@ -1,0 +1,24 @@
+time="2026-10-27T21:09:09Z" level=info msg="Using docker host 'unix:///run/bunker/68817f50/docker.sock', and daemon socket 'unix:///run/bunker/68817f50/docker.sock'"
+[CI/Project contracts and board integrity] ⭐ Run Set up job
+[CI/Project contracts and board integrity] 🚀  Start image=catthehacker/ubuntu:act-latest
+[CI/Project contracts and board integrity]   🐳  docker pull image=catthehacker/ubuntu:act-latest platform= username= forcePull=true
+[CI/Project contracts and board integrity]   🐳  docker create image=catthehacker/ubuntu:act-latest platform= entrypoint=["tail" "-f" "/dev/null"] cmd=[] network="host"
+[CI/Project contracts and board integrity]   🐳  docker run image=catthehacker/ubuntu:act-latest platform= entrypoint=["tail" "-f" "/dev/null"] cmd=[] network="host"
+[CI/Project contracts and board integrity]   🐳  docker exec cmd=[node --no-warnings -e console.log(process.execPath)] user= workdir=
+[CI/Project contracts and board integrity]   ✅  Success - Set up job
+[CI/Project contracts and board integrity] ⭐ Run Main actions/checkout@v4
+[CI/Project contracts and board integrity]   🐳  docker cp src=/home/bunker-68817f50/qa-hermes-rs/. dst=/home/bunker-68817f50/qa-hermes-rs
+[CI/Project contracts and board integrity]   ✅  Success - Main actions/checkout@v4 [266.842421ms]
+[CI/Project contracts and board integrity] ⭐ Run Main Validate kickoff contracts and board JSONL
+[CI/Project contracts and board integrity]   🐳  docker exec cmd=[bash -e /var/run/act/workflow/1] user= workdir=
+[CI/Project contracts and board integrity]   ✅  Success - Main Validate kickoff contracts and board JSONL [243.161556ms]
+[CI/Project contracts and board integrity] ⭐ Run Main Check the usage skill's board claims
+[CI/Project contracts and board integrity]   🐳  docker exec cmd=[bash -e /var/run/act/workflow/2] user= workdir=
+[CI/Project contracts and board integrity]   ✅  Success - Main Check the usage skill's board claims [240.524766ms]
+[CI/Project contracts and board integrity] ⭐ Run Main Check committed whitespace
+[CI/Project contracts and board integrity]   🐳  docker exec cmd=[bash -e /var/run/act/workflow/3] user= workdir=
+[CI/Project contracts and board integrity]   ✅  Success - Main Check committed whitespace [192.165529ms]
+[CI/Project contracts and board integrity] ⭐ Run Complete job
+[CI/Project contracts and board integrity] Cleaning up container for job Project contracts and board integrity
+[CI/Project contracts and board integrity]   ✅  Success - Complete job
+[CI/Project contracts and board integrity] 🏁  Job succeeded
