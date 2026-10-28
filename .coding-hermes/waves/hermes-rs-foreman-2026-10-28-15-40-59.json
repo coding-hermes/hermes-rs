@@ -1,0 +1,27 @@
+{
+  "tick": "hermes-rs-foreman-2026-10-28-15-40-59",
+  "project": "hermes-rs",
+  "budget": 6,
+  "composed_at": "2026-10-28",
+  "workers": [
+    {
+      "task": "DF-HRS-120",
+      "title": "Bunker chaos-corruption: repo-owned probe for the runtime SQLite state.db",
+      "worktree": "/home/kara/worktrees/hermes-rs-DF-HRS-120",
+      "branch": "wt/DF-HRS-120",
+      "base": "origin/main",
+      "base_sha": "888bcb5",
+      "files": [".qa/chaos-probes/corruption.sh", ".qa/chaos-probes/probe_state.py"]
+    },
+    {
+      "task": "DF-HRS-121",
+      "title": "Bunker chaos-errorpath: repo-owned probe observing the session adapter negative paths",
+      "worktree": "/home/kara/worktrees/hermes-rs-DF-HRS-121",
+      "branch": "wt/DF-HRS-121",
+      "base_sha": "888bcb5",
+      "files": [".qa/chaos-probes/errorpath.sh"]
+    }
+  ],
+  "independence": "verified from tasks.jsonl: depends_on=[] on both rows, no shared paths, disjoint file sets (only .qa/chaos-probes/ dir is shared, different files)",
+  "merge_plan": "serial merges onto main, gitreins tier-2 judge per task, guard before each push, single post-merge battery at merged HEAD supplies the fresh-agent AC evidence for both rows"
+}
