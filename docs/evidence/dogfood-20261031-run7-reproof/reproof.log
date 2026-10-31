@@ -1,0 +1,18 @@
+=== documented CLI cold ===
+Hermes RS scaffold: no agent functionality implemented
+TIME wall=7.90 user=20.04 sys=2.91 exit=0
+=== documented CLI warm ===
+Hermes RS scaffold: no agent functionality implemented
+TIME wall=0.07 user=0.05 sys=0.02 exit=0
+=== CLI help literal ===
+Hermes RS scaffold: no agent functionality implemented
+HELP_EXIT=0
+=== CLI unknown literal ===
+Hermes RS scaffold: no agent functionality implemented
+UNKNOWN_EXIT=0
+=== adapter protocol ===
+hermes-rs/session-adapter/1
+PROTOCOL_EXIT=0
+=== adapter malformed frame ===
+MALFORMED_EXIT=4
+malformed request frame: expected ident at line 1 column 2

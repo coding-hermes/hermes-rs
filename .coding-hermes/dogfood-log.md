@@ -292,3 +292,12 @@
 - Findings filed: DF-HRS-122 owns the broken bare `cargo run` instruction; DF-HRS-123 owns the explicit skipped install leg and its fresh-machine proof boundary. Rows and paired events were appended with a self-verifying script: tasks 34 -> 36, events 70 -> 72; boardctl validate RESULT OK with 31 pre-existing warnings; IDs each occur exactly once.
 - Artifacts: `/home/kara/.hermes/cache/scratch/hermes-rs-dogfood-20261031-run7.transcript` sha256 `b24eb4f0556e8d18334f923359e27a56d750ae3788a8d165d5a5b5898ff1ec52`; `/home/kara/.hermes/cache/scratch/hermes-rs-dogfood-20261031-install.jsonl`; no repo integration report or usage-skill edit was made because this lane only records findings and must not fix target code/docs.
 - Verdict: PROMISING-BUT-ROUGH at the measured HEAD. The implemented adapter workflow remains evidenced by prior runs; the CLI usage guide contained a first-command failure when measured, and this run has no fresh-machine install proof. A sibling subsequently landed the DF-HRS-122 docs fix in `1e1523e`; this run did not re-probe it.
+
+## 2026-10-31 dogfood tick (run 7) — reproof
+- Reproof target: clean archive of `origin/main` at `0bb6e3110a3cb8cd793feec61c0b506389602e02`; no product source or usage-skill code changed.
+- CLI real use: cold `cargo run --quiet --bin hermes-rs` exit 0 in 7.90s wall (first-build compilation included); warm repeat exit 0 in 0.07s wall. `--help` and `--bogus` both exit 0 and print only the scaffold line, so the CLI has no useful help and does not reject an unsupported argument. Adapter protocol and malformed-frame controls remain correct (`--protocol` exit 0; malformed stdin exit 4).
+- Adapter real use: `scripts/hrs003_e2e_proof.py` against an isolated debug adapter exit 0 in 5.87s, proving batch append, model usage, two-process reopen, stdlib sqlite3 integrity, schema 31, structured missing-session error, and clean lifecycle.
+- Performance: completed warm CLI operation is 0.07s and not user-noticeable; first-build cold time is compilation. No PERF row or profile.
+- Finding filed: DF-HRS-124, CLI help/unknown-argument contract gap. Evidence: `docs/dogfood/2026-10-31-run7-reproof.md`, `docs/evidence/dogfood-20261031-run7-reproof/`.
+- Install remains `SKIPPED-install-bunker` under DF-HRS-123: bunker-mvp spawn failed at SSH port 22 timeout; no clean-machine claim.
+- Verdict: PROMISING-BUT-ROUGH; adapter workflow works, CLI contract is still rough, and fresh-machine install remains unverified.
