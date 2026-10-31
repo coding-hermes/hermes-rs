@@ -20,6 +20,8 @@ and its supported/unsupported table) before claiming anything about parity.
 cargo build            # library + hermes-rs + hermes-rs-session-adapter
 cargo test --workspace # the battery (needs a `sqlite3` CLI on PATH — see traps)
 cargo run --bin hermes-rs                       # CLI scaffold: prints the stage line, rc=0
+cargo run --bin hermes-rs -- --help             # show CLI usage and options
+cargo run --bin hermes-rs -- --version          # print the crate version
 cargo run --bin hermes-rs-session-adapter        # explicitly run the session adapter
 ```
 

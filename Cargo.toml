@@ -34,6 +34,7 @@ path = "src/bin/session_adapter.rs"
 turso = ["dep:turso", "dep:tokio"]
 
 [dependencies]
+clap = { version = "4", features = ["derive"] }
 rusqlite = { version = "0.40", features = ["bundled", "backup", "functions"] }
 regex = "1"
 # HRS-003 Python interop adapter: JSON request/response frames over stdio.
