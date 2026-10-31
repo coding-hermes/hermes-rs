@@ -1,0 +1,10 @@
+Source artifact: /home/kara/.hermes/cache/scratch/hermes-rs-dogfood-20261031-run7.transcript
+SHA-256: b24eb4f0556e8d18334f923359e27a56d750ae3788a8d165d5a5b5898ff1ec52
+
+The complete transcript is preserved in the source artifact above. Key observed results:
+- HEAD and origin/main: 5c6e7d06c7c72123c8a9023a67d247b60c89825f
+- literal bare cargo run: rc=101; Cargo could not determine which binary to run; available binaries hermes-rs and hermes-rs-session-adapter
+- corrected cargo run --bin hermes-rs: rc=0; Hermes RS scaffold: no agent functionality implemented
+- adapter --protocol: rc=0; hermes-rs/session-adapter/1
+- cargo test --test cli: rc=0; 1 passed, 0 failed
+- corrected CLI timing: cold real=0.09s; warm real=0.08s

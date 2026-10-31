@@ -1,0 +1,31 @@
+Run: hermes-rs-dogfood-2026-10-31-00-08-45
+Target: /home/kara/hermes-rs
+HEAD: 5c6e7d06c7c72123c8a9023a67d247b60c89825f
+
+Literal usage command failed before product startup:
+  env CARGO_TARGET_DIR=<isolated> cargo run --quiet
+  rc=101
+  Cargo could not determine which binary to run; available binaries: hermes-rs, hermes-rs-session-adapter
+
+Control:
+  env CARGO_TARGET_DIR=<isolated> cargo run --quiet --bin hermes-rs
+  rc=0
+  stdout: Hermes RS scaffold: no agent functionality implemented
+
+Adapter control:
+  cargo run --quiet --bin hermes-rs-session-adapter -- --protocol
+  rc=0
+  stdout: hermes-rs/session-adapter/1
+
+Install transport:
+  control-plane: bunker list --server bunker-mvp -> No agents found
+  direct host probe: ssh bunker-mvp -> timeout
+  prescribed helper: bunker-qa.sh launch /home/kara/hermes-rs --server bunker-mvp
+  result: spawn failed while enabling linger; agent SSH port 22 unreachable
+  classification: SKIPPED-install-bunker
+  no agent id was created; no teardown claim needed beyond no-agent census
+
+Board writeback:
+  DF-HRS-122 and DF-HRS-123 appended with paired events 395 and 396.
+  tasks.jsonl 34 -> 36 lines; events.jsonl 70 -> 72 lines.
+  boardctl validate: RESULT OK (31 pre-existing warnings).
