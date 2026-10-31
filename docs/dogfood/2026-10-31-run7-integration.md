@@ -32,7 +32,7 @@ env CARGO_TARGET_DIR=<isolated> cargo run --quiet --bin hermes-rs
 
 It returned rc=0 and printed `Hermes RS scaffold: no agent functionality implemented`. The adapter protocol control returned `hermes-rs/session-adapter/1`, rc=0. The existing `tests/cli.rs` passed 1/1. The binary accepts `--help` and an unknown argument but prints the same scaffold status line, so those flags do not provide normal help or argument validation.
 
-Finding DF-HRS-122 records the broken documented command. No product code was changed.
+Finding DF-HRS-122 records the broken documented command as observed at the measured HEAD. A sibling lane subsequently landed the documented-command fix in `1e1523e`; this run did not re-probe that post-fix tree. No product code was changed by this lane.
 
 ## Performance
 

@@ -28,4 +28,5 @@ Install transport:
 Board writeback:
   DF-HRS-122 and DF-HRS-123 appended with paired events 395 and 396.
   tasks.jsonl 34 -> 36 lines; events.jsonl 70 -> 72 lines.
+  A sibling subsequently landed the DF-HRS-122 docs fix in commit 1e1523e; this run did not re-probe that post-fix tree.
   boardctl validate: RESULT OK (31 pre-existing warnings).
