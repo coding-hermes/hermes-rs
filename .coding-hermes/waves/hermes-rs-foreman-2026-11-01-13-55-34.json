@@ -25,7 +25,18 @@
     "remote_parity": "0 ahead / 0 behind"
   },
   "board_validate": "FAIL inherited baseline: 1 error (events.jsonl line 73 id 73 descends below earlier id 396) and 34 warnings; frozen, not repaired per project skill",
-  "closeout_commit_sha": "pending board closeout commit",
+  "closeout_commit_sha": "self:git-log-subject:board: recover hermes-rs wave 2026-11-01-13-55-34",
   "presolve": "not needed: no non-trivial debugging performed",
-  "trace": "ch:trace row=none:verification-only spec=specs/HERMES_RS_COMPATIBILITY.md#contract wave=none:no-dispatchable-work test=cargo-fmt+clippy+test+artifact-check+skill-claims doc=.coding-hermes/board/events.jsonl prompt=~/.hermes/skills/coding-hermes-foreman/SKILL.md evidence=/home/kara/.hermes/cache/scratch/hermes-rs-foreman-2026-11-01-13-55-34-gates.log witness=github:main@4db11e4 verdict=none:verification-only commit=none:pending-closeout memory=none:pending-write"
+  "trace": "ch:trace row=none:verification-only spec=specs/HERMES_RS_COMPATIBILITY.md#contract wave=none:no-dispatchable-work test=cargo-fmt+clippy+test+artifact-check+skill-claims doc=.coding-hermes/board/events.jsonl prompt=~/.hermes/skills/coding-hermes-foreman/SKILL.md evidence=/home/kara/.hermes/cache/scratch/hermes-rs-foreman-2026-11-01-13-55-34-gates.log witness=github:main@4db11e4 verdict=none:verification-only commit=none:pending-closeout memory=none:pending-write",
+  "finished_at": "2026-11-01T21:19:50Z"
+,
+  "recovery": {
+    "source_manifest": ".coding-hermes/waves/hermes-rs-foreman-2026-11-01-13-55-34.json",
+    "workers_recovered": 0,
+    "worktrees_recovered": 0,
+    "unmerged_branches": 0,
+    "outcome": "nothing-to-recover: manifest is an idle verification-only wave with 0 workers and 0 worktrees; preserved historical worktrees are unrelated to this manifest",
+    "gates": "direct Rust and project gates rerun on canonical HEAD; all passed",
+    "finished_at": "2026-11-01T21:19:50Z"
+  }
 }
