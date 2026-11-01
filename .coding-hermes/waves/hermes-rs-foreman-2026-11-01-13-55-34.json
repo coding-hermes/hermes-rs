@@ -25,7 +25,7 @@
     "remote_parity": "0 ahead / 0 behind"
   },
   "board_validate": "FAIL inherited baseline: 1 error (events.jsonl line 73 id 73 descends below earlier id 396) and 34 warnings; frozen, not repaired per project skill",
-  "closeout_commit_sha": "self:git-log-subject:board: recover hermes-rs wave 2026-11-01-13-55-34",
+  "closeout_commit_sha": "1066902ac920c9bab842e99e82d2e6c9fb442985",
   "presolve": "not needed: no non-trivial debugging performed",
   "trace": "ch:trace row=none:verification-only spec=specs/HERMES_RS_COMPATIBILITY.md#contract wave=none:no-dispatchable-work test=cargo-fmt+clippy+test+artifact-check+skill-claims doc=.coding-hermes/board/events.jsonl prompt=~/.hermes/skills/coding-hermes-foreman/SKILL.md evidence=/home/kara/.hermes/cache/scratch/hermes-rs-foreman-2026-11-01-13-55-34-gates.log witness=github:main@4db11e4 verdict=none:verification-only commit=none:pending-closeout memory=none:pending-write",
   "finished_at": "2026-11-01T21:19:50Z"
