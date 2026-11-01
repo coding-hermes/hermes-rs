@@ -1,0 +1,31 @@
+{
+  "tick_id": "hermes-rs-foreman-2026-11-01-13-55-34",
+  "mode": "idle",
+  "verification_only": true,
+  "wave_id": "none:no-dispatchable-work",
+  "wave_size": 0,
+  "workers": [],
+  "worktrees": [],
+  "base_sha": "4db11e4defb8f136510d885360f94e91b8876744",
+  "selection": {
+    "pending": [
+      {"id": "NEVER-DONE", "priority": "P3", "blocked_on": "perpetual fixture — stays pending by design"},
+      {"id": "DF-HRS-123", "priority": "P2", "blocked_on": "dogfood-scope install leg; coding foreman does not dispatch designated bunker-qa work"}
+    ],
+    "dispatchable": [],
+    "reason": "WAVE_BUDGET=12 but no dispatchable implementation tasks; both pending rows are non-dispatchable by project policy."
+  },
+  "gates": {
+    "cargo_fmt": "PASS",
+    "cargo_clippy": "PASS",
+    "cargo_test": "PASS: 53 passed (default-features) + 64 passed (--all-features), 0 failed, 1 ignored",
+    "artifact_check": "PASS: 37 board rows, 4 kickoff tasks",
+    "skill_claims": "PASS: 0 violations",
+    "diff_check": "PASS",
+    "remote_parity": "0 ahead / 0 behind"
+  },
+  "board_validate": "FAIL inherited baseline: 1 error (events.jsonl line 73 id 73 descends below earlier id 396) and 34 warnings; frozen, not repaired per project skill",
+  "closeout_commit_sha": "pending board closeout commit",
+  "presolve": "not needed: no non-trivial debugging performed",
+  "trace": "ch:trace row=none:verification-only spec=specs/HERMES_RS_COMPATIBILITY.md#contract wave=none:no-dispatchable-work test=cargo-fmt+clippy+test+artifact-check+skill-claims doc=.coding-hermes/board/events.jsonl prompt=~/.hermes/skills/coding-hermes-foreman/SKILL.md evidence=/home/kara/.hermes/cache/scratch/hermes-rs-foreman-2026-11-01-13-55-34-gates.log witness=github:main@4db11e4 verdict=none:verification-only commit=none:pending-closeout memory=none:pending-write"
+}
