@@ -2,12 +2,14 @@
 
 Decision: NO-GO / NO-CUT. This scheduler tick is a readiness sweep, not release authorization. No tag, GitHub Release, or publication mutation was performed.
 
-Target and candidate
+Target and evidence boundary
 - Repository: coding-hermes/hermes-rs
 - Canonical remote: git@github.com:coding-hermes/hermes-rs.git
 - Selected branch: main
-- Candidate: 7bcec2538cad646ae7b69ee8ea601ea2e334a71d
-- Remote main and local HEAD both equal the candidate; worktree clean after the board evidence commit
+- Tested readiness candidate: 7bcec2538cad646ae7b69ee8ea601ea2e334a71d
+- Evidence-only carrier: 25549e131ce77fdf3d631bb1a3b06cd6bb91928f; its exact-head CI run 41374481971 completed success
+- Remote main and local HEAD equal the carrier; the carrier contains only the readiness artifact and board evidence update
+- The detailed local gates and change inventory below are bound to the tested readiness candidate, not silently promoted to the carrier
 - Existing local and remote release tags: none; no prior Release objects
 - Version surface: Cargo.toml package version 0.1.0; no CHANGELOG or numeric changelog heading
 - Semver: first-release proposal only. v0.1.0 is a proposal, not authorization.
