@@ -300,3 +300,205 @@ successor) reaches `origin/main` with green exact-SHA CI and `RELEASE-001` is
 closed, the next sweep re-decides under rules R4/R5 against the new surface —
 including executing the new `scripts/release.sh` in a scratch clone before
 trusting it, per the driver-execution rule.
+
+## Addendum — second delivery of the same tick id, re-decided at the served tip
+
+Tick id `hermes-rs-releng-2026-11-04-15-35-32` was delivered again. Same id
+means one tick: this section is a verification addendum to the first pass, not
+a second sweep. The first pass closed with an explicit instruction, and this
+pass discharges it:
+
+> When `0d256a3` (or its rebased successor) reaches `origin/main` with green
+> exact-SHA CI and `RELEASE-001` is closed, the next sweep re-decides under
+> rules R4/R5 against the new surface — including executing the new
+> `scripts/release.sh` in a scratch clone before trusting it.
+
+### What changed since the first pass
+
+| Fact | First pass (`f9dfd92`) | This pass (`c888bd8`) |
+|---|---|---|
+| Release driver / CHANGELOG / publish workflow / docs | absent | present (`0d256a3`, `0d1c301`) |
+| `RELEASE-001` | pending P1 | complete, bound to `0d256a3` |
+| `scripts/release.sh` executed anywhere | no | dry run rc=0 (this pass, below) |
+| aarch64 release build | never attempted | rc=0 (this pass, below) |
+| `release.yml` runs ever | 0 | 0 |
+
+The tip moved twice while this pass measured it, both times by a sibling
+foreman and both times board-only: `4a8a648` (closed `RELEASE-001`) and
+`c888bd8` (recorded the `RELEASE-001` memory receipt as
+`namespace-unverified`). The pass opened at `ca3184e` and closed at
+`c888bd8`; `git diff --name-only ca3184e..c888bd8` lists only
+`.coding-hermes/board/{board,events,tasks}.jsonl`, so every build input the
+gates below measured is byte-identical to the candidate they ran on.
+
+### Candidate
+
+| Field | Value |
+|---|---|
+| Candidate SHA | `c888bd8fbd867b2412ae01dca2c612d29bf81e7c` |
+| `git ls-remote origin refs/heads/main` | `c888bd8fbd867b2412ae01dca2c612d29bf81e7c` |
+| Provider API `commits/main` | agrees (CI run `41869553562` is bound to this SHA) |
+| Local `HEAD` | `c888bd8fbd867b2412ae01dca2c612d29bf81e7c` |
+| Parity `git rev-list --left-right --count origin/main...HEAD` | `0  0` |
+| Working tree | clean |
+
+Exact-SHA hosted CI on the candidate: run `41869553562` (`CI`) — **success**.
+The two intermediate tips are green as well: `41869113771` at `4a8a648`,
+`41866937437` at `ca3184e`. `Rust CI` last executed as run `41843588109` at
+`7056810`; nothing since touches `.rs`, `Cargo.toml`, `Cargo.lock` or
+`rust-toolchain*`, so it stands by tree identity.
+
+### Driver execution (the rule this pass owed)
+
+Clean detached worktree at the candidate; every command run there, none in the
+shared checkout.
+
+| Probe | Command | Result |
+|---|---|---|
+| Plan resolution | `scripts/release.sh --dry-run` | **rc=0**, plan fully resolved |
+| Refusal path | `scripts/release.sh` (bare) | **rc=2**, explicit message, no tag created |
+| Tree after both | `git status --porcelain`, `git tag \| wc -l` | empty, `0` |
+
+The dry run resolved: version `0.1.0` in `Cargo.toml` matching `Cargo.lock`
+`0.1.0`; tag `v0.1.0` absent locally and on origin; no dated `0.1.0` CHANGELOG
+section yet; `[Unreleased]` non-empty (58 lines, **16 feature bullets, 0
+`chore`/`board` bullets**, so the notes do not lead with bookkeeping churn);
+artifact names `hermes-rs-v0.1.0-x86_64-unknown-linux-gnu` and
+`hermes-rs-session-adapter-v0.1.0-x86_64-unknown-linux-gnu`; a two-line
+`SHA256SUMS` plan. The CHANGELOG transform was exercised into a temporary
+directory and discarded — the repository was not written to.
+
+The refusal path at this tip surfaces the main-branch precondition first
+(`REFUSED: HEAD is on 'detached HEAD', not main — releases are cut from main`,
+rc=2), which is the operational consequence recorded in the decision below:
+the real cut must run where `HEAD` is literally `main`.
+
+The surface files (`scripts/release.sh`, `CHANGELOG.md`,
+`.github/workflows/release.yml`, `docs/releases.md`) are byte-identical to
+`0d1c301`, the commit that carries the tier-2 PASS verdict
+(`.gitreins/history/2026-11-04/31f6d666/verdict.json`, RELEASE-001, 6/6 items,
+`[DEGRADED — skipped: lint/tests: no staged files]` because the judged commit
+was board/docs-only). `git diff --name-only 0d1c301..HEAD -- scripts/
+.github/workflows/release.yml CHANGELOG.md docs/releases.md` is empty, so that
+verdict carries to this tip by tree identity rather than by re-reading it as
+fresh.
+
+### Local gate replay at the candidate
+
+| Gate | Command | rc |
+|---|---|---|
+| Format | `cargo fmt --all -- --check` | 0 |
+| Lint | `cargo clippy --workspace --all-targets --all-features -- -D warnings` | 0 |
+| Tests | `cargo test --workspace --all-features` | 0 — **65 passed, 0 failed, 3 ignored** across 18 test binaries |
+| Project contracts | `python3 scripts/check-project-artifacts.py` | 0 |
+| Skill-claim check | `python3 scripts/check_skill_claims.py` | 0 |
+| Advisory scanner | `cargo audit --json` | 0 — `vulnerabilities.found=false`, 0 advisories, 1 `unsound` warning (`RUSTSEC-2026-0253`, disclosed under closed `SEC-HRS-001`) |
+
+### Artifact-strategy probe: the aarch64 leg now has measured evidence
+
+`release.yml` builds both binaries for `x86_64-unknown-linux-gnu` and
+`aarch64-unknown-linux-gnu`. That workflow has **never run** (0 runs total),
+so before this pass the aarch64 leg was unproven anywhere. It was exercised
+locally at the candidate with the workflow's own environment:
+
+```
+rustup target add aarch64-unknown-linux-gnu                       rc=0
+CARGO_TARGET_DIR=<scratch>/arm64-target \
+CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
+CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc \
+AR_aarch64_unknown_linux_gnu=aarch64-linux-gnu-ar \
+cargo build --release --locked --target aarch64-unknown-linux-gnu \
+  --bin hermes-rs --bin hermes-rs-session-adapter                  rc=0
+```
+
+Products: `hermes-rs` 1,012,480 bytes and `hermes-rs-session-adapter`
+3,137,112 bytes, both `ELF 64-bit LSB pie executable, ARM aarch64`, built in
+1m11s. Bundled SQLite cross-compiled without an extra C-toolchain override, so
+the publish leg's risk narrows to the workflow wiring (prepare checks, artifact
+naming, `SHA256SUMS` assembly, release creation), not the cross-compile. These
+are strategy evidence, not publishable assets, and nothing was published.
+
+### Decision — unchanged in verdict, reduced in reasons: NO CUT
+
+The rule that fires is Decision 1 rule 2 as the repository itself writes it,
+plus Decision 1b. `specs/ROADMAP.md` Gate 8 states it plainly:
+
+> Gate releases on compatibility evidence, clean-machine installation, security
+> review, data migration/rollback, and documented support versions.
+
+and the same document's finish line adds that "a supported release must run
+the upstream Hermes harness against the Python reference and Rust target
+through an explicit adapter... and ship tested install, upgrade, backup,
+migration, and rollback paths." At this candidate:
+
+1. `HRS-127` (P1, pending) still records that the paired AC-2/AC-9
+   comparative run has never been executed and that the compatibility matrix's
+   comparative-scoring row is still `Untriaged`.
+2. `DF-HRS-123` (P2, pending) still owns the unproven clean-machine install
+   leg; `QA-HERMES-RS-FOREMAN-1` (P1) records the battery launch refused on
+   host capacity, so the QA leg carries no fresh evidence either.
+3. No install, upgrade, backup, migration or rollback path has been exercised
+   for a released artifact — there has never been one.
+
+What is retired from the first pass's NO-GO: **"no release surface exists" is
+no longer true**. The surface exists, is executable (dry run rc=0), refuses
+safely (bare rc=2), and its publish driver has never run. A v0.1.0 tag today
+would still certify a product state the repository's own roadmap denies, so
+the cut stays refused — for one fewer reason, with the gate named.
+
+One new dispatchable gap was filed: **`RELEASE-002`** — the publish path has
+never executed, so the first tag push would be its first run, at a moment when
+the tag is already published and immutable. Its acceptance criteria ask for a
+build-only dispatchable path plus one green run that produces all four
+artifacts and verifies `SHA256SUMS`; publishing stays gated behind a real tag.
+
+### Operational note for the executing pass
+
+`scripts/release.sh` refuses unless `HEAD` is on a branch literally named
+`main`. A detached worktree (how every gate in this lane is measured) can run
+`--dry-run` but cannot run the cut. The authorized pass therefore runs the cut
+either in the canonical checkout while it is clean and quiescent, or in a fresh
+`git clone` of the published remote where `main` is checked out — and it must
+re-check `git log -1` immediately before, because this repository's board is
+being written by sibling lanes every few minutes.
+
+### Dependency state (Decision 3)
+
+No advisory: `cargo audit` reports 0 vulnerabilities. An updater listing
+(`cargo update --dry-run`) shows **42 packages** with compatible updates
+available, all patch/minor: `tokio 1.53.3 → 1.54.1`, `libc 0.2.190 → 0.2.191`,
+`rustix 1.1.5 → 1.1.6`, `smallvec 1.16.3 → 1.16.4`, `uuid 1.28.0 → 1.29.0`,
+`cc 1.8.0 → 1.11.0`, `icu_* 2.3 → 2.4` (9 crates), `log 0.4.34 → 0.4.35`,
+plus transitive patch bumps. Under Decision 3 patch-level moves batch at
+release time, and the release is refused, so nothing was moved. No major bump
+is pending. `Cargo.lock` is unchanged by this pass.
+
+### Public posture (re-measured)
+
+| Item | Reading |
+|---|---|
+| Visibility / license | public, `MIT` (`LICENSE` present) |
+| Secret scanning | **disabled** |
+| Push protection | **disabled** |
+| Validity checks / non-provider patterns | disabled |
+| Dependabot security updates | disabled |
+| Branch protection | HTTP 404 `Branch not protected` — owner decision, not touched |
+| Open secret-scanning alerts | query returns 404 because the scanner is off; the "0" this would print proves nothing |
+
+The disabled-scanner rows are recorded, not repaired: enabling them is an
+owner-scoped repository setting, and branch protection would block every lane's
+direct push to `main`.
+
+### Board state
+
+46 rows: 39 complete, 7 pending (`NEVER-DONE`, `DF-HRS-123`, `HRS-127`,
+`HRS-128`, `DF-HRS-126`, `QA-HERMES-RS-FOREMAN-1`,
+`RELEASE-READINESS-2026-11-01`). `boardctl validate` baseline is unchanged at
+1 error / 38 warnings, the error being the pre-existing `events.jsonl` line 73
+descending-id defect (id 73 below 396) — inherited, not introduced here.
+
+### Rollback
+
+Nothing was created: 0 tags local, 0 tags on origin, 0 Release objects, no
+artifact published, `Cargo.lock` and every source file untouched. There is
+nothing to roll back. `git tag | wc -l` = 0 after this pass as before it.
