@@ -240,3 +240,35 @@ results, and `RELEASE-001` (release surface: driver, changelog, tag-triggered
 CI, checksum manifest, release docs) must land, before any readiness sweep can
 return GO. The first-use artifact channel is escalated in `RELEASE-001` with a
 recorded silence default.
+
+## Verification addendum — re-delivery of the same sweep id
+
+Written 2026-11-04T15:49Z. The scheduler delivered sweep id
+`hermes-rs-releng-2026-11-04-15-35-32` a second time (slot 15:35:32Z = 10:35
+local; the first pass committed 8 minutes later). Same id means one instance,
+so this pass verified the landed evidence instead of re-running the sweep and
+re-cutting. Nothing above was re-derived; every claim below was re-measured at
+the tip now being served.
+
+| Claim from the first pass | Re-measured | Result |
+|---|---|---|
+| Candidate `f9dfd92` is an ancestor of the landed tip | `git merge-base --is-ancestor f9dfd92 HEAD` | holds |
+| Tip after the carrier commit | local `HEAD`, `git ls-remote origin refs/heads/main`, `gh api .../commits/main` | all three = `527f8ba7fdedd3d7c1d0e19cff214c6d6bf3c53a` |
+| Parity | `git rev-list --left-right --count origin/main...HEAD` | `0  0`, tree clean |
+| Rust gate by tree identity | `git diff --name-only f9dfd92..527f8ba` | 3 paths, all `.coding-hermes/` — **0 non-board files**, so the code tree is byte-identical to `7056810` and run `41843588109` stands |
+| Exact-tip CI | `gh api .../commits/527f8ba/check-runs` | `total_count` = 1, `Project contracts and board integrity` = success (run `41860800831`) |
+| Prior candidate CI | run `41859642830` at `f9dfd92` | success, unchanged |
+| Public release surface | `gh api .../tags` and `.../releases` | 0 and 0; `git ls-remote --tags origin` empty |
+| Board census | `jq` over `tasks.jsonl` | **46 rows — 38 complete, 8 pending** (delta vs this doc's 44/38/6 is exactly the two rows this sweep itself filed: `RELEASE-001`, `DF-HRS-126`) |
+| Board validator | `boardctl validate` | FAIL (1 error, 38 warnings) — unchanged baseline; the error is the inherited `events.jsonl` line 73 descending id |
+| Advisory scan | `cargo audit --json` | 0 vulnerabilities, 1 `unsound` warning, `RUSTSEC-2026-0253` (disclosed and closed under `SEC-HRS-001`; no patched release exists) |
+| Version surface | `Cargo.toml`, `CHANGELOG*`, `VERSION` | `0.1.0`; no changelog, no VERSION file — gap unchanged |
+| Deployed staleness | `command -v hermes-rs*`, `~/.local/bin/hermes-rs*` | absent — no stale installed binary exists |
+
+Decision unchanged: **NO CUT (rule R2 plus Decision 1b).** No tag was created,
+no Release object was published, no dependency moved, and no duplicate row was
+filed — identical state to the first pass, so this addendum is the only write.
+Open gates remain `HRS-127` (paired upstream-harness comparative run) and
+`RELEASE-001` (release surface). Both are pending and dispatchable to the
+foreman; neither is an owner-authorization hold.
+
