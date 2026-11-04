@@ -272,3 +272,13 @@ Open gates remain `HRS-127` (paired upstream-harness comparative run) and
 `RELEASE-001` (release surface). Both are pending and dispatchable to the
 foreman; neither is an owner-authorization hold.
 
+### Carrier repair
+
+The first addendum carrier `c99dea7` failed its exact-tip CI, run
+`41862012532`, on the `Check committed whitespace` step (`git show --check`):
+this addendum had introduced one blank line at EOF. Every other step of the job
+passed (`Validate kickoff contracts and board JSONL`, `Check the usage skill's
+board claims`, checkout). The blank line was removed so the file ends with a
+single newline, `git diff --check` reports clean, and the repair carrier is
+verified by its own exact-SHA run. The failed carrier is recorded rather than
+hidden; the decision below is unaffected.
