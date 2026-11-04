@@ -1,0 +1,21 @@
+=== audit 2026-11-04T14:47:22Z HEAD=4946822 ===
+--- cargo fmt --all -- --check
+FMT_RC=0
+--- cargo clippy --workspace --all-targets --all-features -- -D warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.46s
+--- cargo test --workspace --all-features (aggregated)
+passed=65 failed=0 ignored=0
+--- tests targets
+14
+--- src loc
+  4942 total
+--- tags
+0
+--- board census
+     37 complete
+      4 pending
+41
+--- rust-ci gate commands
+37:        run: cargo fmt --all -- --check
+39:        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+41:        run: cargo test --workspace --all-features
