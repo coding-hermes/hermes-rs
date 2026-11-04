@@ -282,3 +282,21 @@ board claims`, checkout). The blank line was removed so the file ends with a
 single newline, `git diff --check` reports clean, and the repair carrier is
 verified by its own exact-SHA run. The failed carrier is recorded rather than
 hidden; the decision below is unaffected.
+
+### Concurrent sibling landing — outside this carrier's evidence boundary
+
+While this carrier was being prepared, a sibling lane committed `0d256a3`
+("release: add the release surface — driver, CHANGELOG, tag-triggered publish
+workflow, docs") in the shared checkout: `scripts/release.sh`, `CHANGELOG.md`,
+`docs/releases.md`, `.github/workflows/release.yml` and three evidence files,
+1451 insertions. At the moment of writing that commit was **unpushed** and had
+no CI run, so this carrier stays bound to `c99dea7` and publishes only the
+board/evidence delta; it does not verify the release surface.
+
+That changes the shape of the next decision but not this one: `HRS-127` (P1,
+the paired upstream-harness comparative run named by ROADMAP Gate 8) is still
+open, so Decision 1 rule R2 still blocks a cut. When `0d256a3` (or its rebased
+successor) reaches `origin/main` with green exact-SHA CI and `RELEASE-001` is
+closed, the next sweep re-decides under rules R4/R5 against the new surface —
+including executing the new `scripts/release.sh` in a scratch clone before
+trusting it, per the driver-execution rule.
