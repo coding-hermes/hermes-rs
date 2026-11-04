@@ -37,9 +37,9 @@ level per TEST_ADAPTER_CONTRACT.md §4.3/§8:
 
 | # | Upstream case ID | Class | Python arm (pinned reference) | Rust arm (this slice) | Status |
 |---|---|---|---|---|---|
-| 1 | `test_cell1_prefix_durability.py::test_acknowledged_appends_survive_sigkill[None]` | platform-host | 89-pass scoped suite run (HRS-005, `baseline/hrs005-scoped-suite.log`) — this case passed in-process | `f3_slice_scale_acknowledged_writes_survive_close_and_reopen` — 25 appends, clean close, contiguous prefix after reopen. **Real-SIGKILL-to-a-child-process leg NOT run** | PAIRED-RESULT (partial; skip reason below) |
-| 2 | `..._sigkill[DELETE]` | platform-host | same suite leg | journal resolved `delete` on the pinned interpreter; Rust arm covers the rollback-journal surface via fixture open + `journal_mode_at_rest: delete` in the manifest. **SIGKILL leg not run** | PAIRED-RESULT (partial; same skip reason) |
-| 3 | `..._sigkill[WAL]` | platform-host | upstream SKIPS via resolver downgrade gates (pinned interpreter's linked SQLite 3.50.4 is in the WAL-reset bug range) | Rust-side: `f5_passive_checkpoint_policy_and_wal_hygiene` covers the WAL-available leg (bundled SQLite 3.53.2 resolves WAL with verified read-back) | PAIRED-RESULT (upstream skip recorded, not a pass) |
+| 1 | `test_cell1_prefix_durability.py::test_acknowledged_appends_survive_sigkill[None]` | platform-host | 89-pass scoped suite run (HRS-005, `baseline/hrs005-scoped-suite.log`) — this case passed in-process | `p7_kill9_child_writer_committed_rows_survive` covers a real child-process SIGKILL after a committed 200-row burst; HRS-010 `f3_sigkill_child_acknowledged_rows_survive_for_each_journal_preference` independently exercises the stock session-store API | PAIRED-RESULT (crash window proven for Rust stock store; Python-side pairing remains historical) |
+| 2 | `..._sigkill[DELETE]` | platform-host | same suite leg | HRS-010 explicitly requests RollbackOnly and verifies the resolved delete/rollback mode; acknowledged child rows survive SIGKILL | PAIRED-RESULT (Rust DELETE/rollback leg proven) |
+| 3 | `..._sigkill[WAL]` | platform-host | upstream SKIPS via resolver downgrade gates (pinned interpreter's linked SQLite 3.50.4 is in the WAL-reset bug range) | HRS-010 Default resolves WAL on this host and verifies the committed child burst after SIGKILL | PAIRED-RESULT (upstream skip recorded, Rust WAL leg proven) |
 | 4 | `test_cell2_consume_once.py::test_exactly_one_claimant_wins` | platform-host | passed in the scoped suite | **Not implemented in this slice** — `compression_locks`/`session_turn_leases` predicated-UPDATE claiming is out of the §6.1 operation set (deferred; guards exist as typed errors only) | NOT-IN-SLICE (reason: §6.1 scope; lease-claim machinery is a later gate item) |
 | 5–7 | `test_cell3_rotation_atomicity.py::test_rotation_is_atomic_under_sigkill[None|DELETE|WAL]` | platform-host | passed in the scoped suite | **Not implemented** — compression rotation (parent end-stamp + child publication in one txn) is out of §6.1 | NOT-IN-SLICE (reason: §6.1 scope; `CompressionClosed` guard tested instead) |
 | 8–13 | `test_cell5_delivery_outbox_exactly_once.py` (6 cases) | platform-host | passed in the scoped suite | **Not implemented** — async_delegations delivery outbox is out of §6.1 | NOT-IN-SLICE (reason: §6.1 scope) |
@@ -58,7 +58,7 @@ transport vectors (`prototypes/test_adapter/last_paired_run_ok.json`).
 
 | Item | Reason | Recorded where |
 |---|---|---|
-| Real SIGKILL crash-window leg (F-3 platform-host class) | needs a separate child OS process + barrier discipline; slice proves close/reopen prefix durability in-process. The kill-window harness is a later task. | §2 rows 1–3; test doc comment |
+| Real SIGKILL crash-window leg (F-3 platform-host class) | Now exercised by the HRS-009 parity test and HRS-010 stock session-store test. A child commits 200 acknowledged rows in one transaction, signals readiness, continues writing, and is then SIGKILLed; parents verify exact committed contents, contiguous ids, seed durability, and no quarantine. HRS-010 records actual resolved modes: Default=wal, RollbackOnly=delete/rollback, NoCreate=wal on this host. | `tests/hrs009_backend_parity.rs`, `tests/hrs010_crash_window.rs`; `docs/evidence/hrs010/crash-window-nonvacuity.log` |
 | CJK FTS tokenizer (`cjk_unicode61`) | tokenizer is a loadable extension not present in the bundled SQLite; capability reports `Degraded { reason: "no such tokenizer: cjk_unicode61" }` — never a silent partial search. Fixture records `messages_fts_cjk: unavailable` from the pinned interpreter. | manifest `fts_counts`; capability test |
 | WAL on the pinned interpreter | linked SQLite 3.50.4 in the WAL-reset bug range → upstream's own guard resolves `delete` (fixture `journal_mode_at_rest: delete`). Rust's bundled 3.53.2 is NOT in that range and resolves WAL with verified read-back. Both facts recorded. | manifest; generator stderr; capability test |
 | `fts_storage_version` marker absent on the fixture | the marker is stamped by the reference only during a v23+ ensure on FRESH stores; the fixture file was produced by the reference's normal open path. Rust stamps it only on fresh scaffolds (same rule). | OpenReport semantics in code comment |
@@ -132,5 +132,6 @@ F-9 test FAILED against the mutant and passes against the restored code
 No speed or efficiency statement of any kind (HRS-009 deferred). No Turso/
 PostgreSQL statement. No default-backend change. No full Hermes parity:
 compression rotation, lease claiming, outbox delivery, display-generation
-dedupe, backup-restore CLI flows, and the crash-window harness remain
-unimplemented and are enumerated above.
+dedupe, and backup-restore CLI flows remain unimplemented. The crash-window
+coverage does NOT prove safety during a checkpoint or backup, cjk tokenizer
+behavior, or multi-writer kill races.

@@ -1089,8 +1089,8 @@ fn f3_slice_scale_acknowledged_writes_survive_close_and_reopen() {
         .unwrap();
     store.close().expect("close");
     // Reopen: every acknowledged append is a contiguous prefix (F-3 at
-    // slice scale — no SIGKILL in-process; the platform-host leg of F-3
-    // is recorded as a skip-with-reason in the parity report).
+    // slice scale). The actual child-process SIGKILL leg is exercised in
+    // tests/hrs010_crash_window.rs; this test separately proves close/reopen.
     let (reopened, _open2) = StockSqliteBackend::open(OpenOptions::read_write(&path)).unwrap();
     let msgs = reopened
         .read(&mut |tx: &mut dyn hermes_rs::persistence::ReadTxn| {

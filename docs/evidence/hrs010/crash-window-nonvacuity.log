@@ -1,0 +1,35 @@
+DF-HRS-125 crash-window non-vacuity evidence
+
+Target directory: /var/tmp/hrs125-target
+Host: Unix; SIGKILL is signal 9.
+
+RED mutation
+Exact temporary source mutation: in tests/hrs009_backend_parity.rs, replace the child --exact target "hrs009_crash_child::crash_child" with "no_such_child". This makes libtest exit successfully with zero tests while the parent must reject the missing readiness sentinel.
+Command:
+CARGO_TARGET_DIR=/var/tmp/hrs125-target cargo test --test hrs009_backend_parity --features turso p7_kill9_child_writer_committed_rows_survive -- --nocapture
+Observed exit: 101
+Captured failure signature:
+thread 'p7_kill9_child_writer_committed_rows_survive' panicked:
+stock-sqlite: child exited before readiness (exit status: 0); stdout=
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 11 filtered out
+...
+test p7_kill9_child_writer_committed_rows_survive ... FAILED
+
+RESTORE proof
+Restored the child target to "hrs009_crash_child::crash_child". SHA-256 before mutation and after restore are byte-identical:
+57d283aa8cdae4be9e6323808c4a86e2f23c437769418b5e16b4bd245dbfbdd9  tests/hrs009_backend_parity.rs
+
+GREEN commands and observed tails
+CARGO_TARGET_DIR=/var/tmp/hrs125-target cargo test --test hrs009_backend_parity --features turso -- --nocapture
+10 passed; 0 failed; 1 ignored; p7_kill9_child_writer_committed_rows_survive ... ok.
+
+CARGO_TARGET_DIR=/var/tmp/hrs125-target cargo test --test hrs010_crash_window -- --nocapture
+HRS-010 crash-window preference=default resolved_journal=wal
+HRS-010 crash-window preference=rollback-only resolved_journal=delete/rollback
+HRS-010 crash-window preference=no-create resolved_journal=wal
+test f3_sigkill_child_acknowledged_rows_survive_for_each_journal_preference ... ok
+1 passed; 0 failed; 1 ignored.
+
+The only ignored tests are the two child harness entry points, each explicitly selected by its parent. The parents verify the acknowledged 200-row prefix, child death by SIGKILL, and successful healthy-file reopen without quarantine.

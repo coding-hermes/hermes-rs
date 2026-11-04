@@ -363,16 +363,19 @@ fn p6_backup_and_restore() {
 
 #[test]
 fn p7_kill9_child_writer_committed_rows_survive() {
+    use std::os::unix::process::ExitStatusExt;
+
     for w in ALL {
         let path = scratch("crash");
-        // Parent scaffolds the store.
+        let ready = path.with_extension("db.child-ready");
+        let session = "20261015_p7_seed";
         {
             let store = open(w, &path).unwrap();
             store
                 .write(Patience::WRITE, &mut |tx: &mut dyn WriteTxn| {
-                    tx.ensure_session("20261015_p7_seed", "cli", None)?;
+                    tx.ensure_session(session, "cli", None)?;
                     tx.append_message(
-                        "20261015_p7_seed",
+                        session,
                         &AppendMessage {
                             role: "user".into(),
                             content: Some("seed".into()),
@@ -382,57 +385,109 @@ fn p7_kill9_child_writer_committed_rows_survive() {
                     Ok(())
                 })
                 .unwrap();
-            // Backend-specific child binary: stock uses the bench example's
-            // dataset writer; turso opens the same file only from ITS process
-            // (single-process engine). The child runs the matching writer.
-            drop(store);
         }
-        let exe = std::env::current_exe().expect("test exe");
         let backend_flag = match w {
             Which::Stock => "stock",
             Which::Turso => "turso",
         };
-        // The child binary is built from tests/hrs009_crash_child.rs —
-        // invoked with the db path + backend; it commits N rows then the
-        // parent SIGKILLs it mid-burst.
-        let child = std::process::Command::new(exe)
+        let path_arg = path.display().to_string();
+        let ready_arg = ready.display().to_string();
+        let mut child = std::process::Command::new(std::env::current_exe().expect("test exe"))
             .args([
                 "--exact",
-                "crash_child",
+                "hrs009_crash_child::crash_child",
                 "--nocapture",
                 "--ignored",
                 "--",
-                &path.display().to_string(),
+                &path_arg,
                 backend_flag,
+                &ready_arg,
             ])
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
-            .spawn();
-        let mut child = match child {
-            Ok(c) => c,
-            Err(e) => panic!("{}: crash-child spawn failed: {e}", name(w)),
-        };
-        // Give the child a moment to commit its rows, then SIGKILL.
-        std::thread::sleep(std::time::Duration::from_millis(1500));
-        let killed = unsafe { kill_child(child.id()) };
-        assert!(killed, "{}: child was killable", name(w));
-        let _ = child.wait();
-        // Reopen: committed rows survive; no torn rows (rowid chain intact).
-        let store = open(w, &path).expect("{}: reopen after kill -9");
-        let msgs = store
-            .read(&mut |tx: &mut dyn ReadTxn| {
-                tx.get_messages("20261015_p7_seed", false, false, None, 0)
-            })
-            .expect("read after crash");
-        // At minimum the seed row survives; the child's committed rows are a
-        // prefix with ascending ids and no torn content.
-        assert!(!msgs.is_empty(), "{}: seed row survived crash", name(w));
+            .spawn()
+            .unwrap_or_else(|e| panic!("{}: crash-child spawn failed: {e}", name(w)));
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+        while !ready.exists() {
+            if let Some(status) = child.try_wait().expect("poll child") {
+                let output = child
+                    .wait_with_output()
+                    .expect("collect exited child output");
+                let _ = std::fs::remove_dir_all(path.parent().expect("scratch parent"));
+                panic!(
+                    "{}: child exited before readiness ({status}); stdout={} stderr={}",
+                    name(w),
+                    String::from_utf8_lossy(&output.stdout),
+                    String::from_utf8_lossy(&output.stderr)
+                );
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "{}: child readiness timed out",
+                name(w)
+            );
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
         assert!(
-            msgs.windows(2).all(|win| win[0].id < win[1].id),
-            "{}: no torn rows (ids strictly ascending)",
+            unsafe { kill_child(child.id()) },
+            "{}: SIGKILL sent",
             name(w)
         );
+        let output = child.wait_with_output().expect("wait/reap SIGKILLed child");
+        assert_eq!(
+            output.status.signal(),
+            Some(9),
+            "{}: child must die by SIGKILL, got {:?}",
+            name(w),
+            output.status
+        );
+        let libtest = format!(
+            "{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(
+            !libtest.contains("running 0 tests") && !libtest.contains("0 passed"),
+            "{}: child libtest executed no test: {libtest}",
+            name(w)
+        );
+        assert!(
+            libtest.contains("running 1 test"),
+            "{}: expected exactly one child test: {libtest}",
+            name(w)
+        );
+        let store = open(w, &path).expect("reopen after SIGKILL");
+        assert!(
+            store.open_report().quarantined.is_none(),
+            "{}: healthy file must not be quarantined",
+            name(w)
+        );
+        let msgs = store
+            .read(&mut |tx: &mut dyn ReadTxn| tx.get_messages(session, false, false, None, 0))
+            .expect("read after crash");
+        assert!(
+            msgs.len() >= 201,
+            "{}: seed plus acknowledged child prefix; observed {} rows",
+            name(w),
+            msgs.len()
+        );
+        assert_eq!(msgs[0].content.as_deref(), Some("seed"));
+        for (i, row) in msgs[1..201].iter().enumerate() {
+            assert_eq!(
+                row.content.as_deref(),
+                Some(format!("child burst {i}").as_str())
+            );
+            assert_eq!(
+                row.id,
+                msgs[0].id + i as i64 + 1,
+                "{}: contiguous ascending ids",
+                name(w)
+            );
+        }
         drop(store);
+        std::fs::remove_file(&ready).expect("remove readiness sentinel");
+        std::fs::remove_dir_all(path.parent().expect("scratch parent"))
+            .expect("remove crash scratch");
     }
 }
 
@@ -446,6 +501,9 @@ extern "C" {
     #[link_name = "kill"]
     fn libc_kill(pid: i32, sig: i32) -> i32;
 }
+
+#[path = "hrs009_crash_child.rs"]
+mod hrs009_crash_child;
 
 // ── 8. concurrent access (2 writers + 2 readers for 10 s) ───────────────
 

@@ -1,81 +1,103 @@
-//! HRS-009 crash-recovery child: run as `cargo test --test hrs009_backend_parity
-//! crash_child -- --ignored -- -- <db-path> <backend>`. Commits a burst of
-//! rows, then idles until the parent SIGKILLs it. The parent's assertion is
-//! that committed rows survive and no torn row appears.
+//! Ignored crash child included by the HRS-009 parity integration-test target.
 
 use hermes_rs::persistence::{
     AppendMessage, OpenOptions, Patience, SessionStore, StockSqliteBackend, WriteTxn,
 };
 
 #[test]
-#[ignore = "crash-child harness: driven by p7_kill9 via --exact with args"]
+#[ignore = "crash-child harness driven by the parent test via --exact"]
 fn crash_child() {
     let args: Vec<String> = std::env::args().collect();
-    // test-binary arg shape: <bin> --exact crash_child --ignored -- -- <path> <backend>
-    let sep = args.iter().position(|a| a == "--").expect("arg separator");
-    let rest = &args[sep + 1..];
-    // rest may start with another "--" (libtest passthrough)
-    let rest: Vec<&String> = rest.iter().filter(|a| a.as_str() != "--").collect();
-    let path = rest[0].clone();
-    let backend = rest.get(1).map(|s| s.as_str()).unwrap_or("stock");
+    let separator = args
+        .iter()
+        .position(|arg| arg == "--")
+        .expect("libtest argument separator");
+    let args = &args[separator + 1..];
+    let args: Vec<&str> = args
+        .iter()
+        .filter(|arg| arg.as_str() != "--")
+        .map(String::as_str)
+        .collect();
+    let path = args.first().expect("database path");
+    let backend = args.get(1).copied().unwrap_or("stock");
+    let ready = args.get(2).expect("readiness sentinel");
+    let session = "20261015_p7_seed";
 
     match backend {
         "turso" => {
             #[cfg(feature = "turso")]
             {
-                let (mut store, _o) =
-                    TursoBackend::open(OpenOptions::read_write(&path)).expect("child open turso");
-                store
-                    .write(Patience::TRANSCRIPT, &mut |tx: &mut dyn WriteTxn| {
-                        for i in 0..200u64 {
+                use hermes_rs::persistence::TursoBackend;
+                let (store, _) = TursoBackend::open(OpenOptions::read_write(path))
+                    .expect("open turso child store");
+                append_acknowledged_burst(&store, session);
+                publish_ready(ready);
+                let mut next = 0u64;
+                loop {
+                    store
+                        .write(Patience::TRANSCRIPT, &mut |tx: &mut dyn WriteTxn| {
                             tx.append_message(
-                                "20261015_p7_seed",
+                                session,
                                 &AppendMessage {
                                     role: "user".into(),
-                                    content: Some(format!("child burst {i}")),
+                                    content: Some(format!("unbounded {next}")),
                                     ..Default::default()
                                 },
                             )?;
-                        }
-                        Ok(())
-                    })
-                    .expect("child writes committed");
-                println!("child committed 200 rows via turso");
-                store.close().ok();
-                // Idling here is fine: the parent kills us whenever.
-                loop {
-                    std::thread::sleep(std::time::Duration::from_millis(100));
+                            Ok(())
+                        })
+                        .expect("append during kill window");
+                    next += 1;
                 }
             }
             #[cfg(not(feature = "turso"))]
-            panic!("turso arm requires --features turso");
+            panic!("turso child requested without the turso feature");
         }
-        _ => {
-            let (mut store, _o) =
-                StockSqliteBackend::open(OpenOptions::read_write(&path)).expect("child open stock");
-            store
-                .write(Patience::TRANSCRIPT, &mut |tx: &mut dyn WriteTxn| {
-                    for i in 0..200u64 {
+        "stock" => {
+            let (store, _) = StockSqliteBackend::open(OpenOptions::read_write(path))
+                .expect("open stock child store");
+            append_acknowledged_burst(&store, session);
+            publish_ready(ready);
+            let mut next = 0u64;
+            loop {
+                store
+                    .write(Patience::TRANSCRIPT, &mut |tx: &mut dyn WriteTxn| {
                         tx.append_message(
-                            "20261015_p7_seed",
+                            session,
                             &AppendMessage {
                                 role: "user".into(),
-                                content: Some(format!("child burst {i}")),
+                                content: Some(format!("unbounded {next}")),
                                 ..Default::default()
                             },
                         )?;
-                    }
-                    Ok(())
-                })
-                .expect("child writes committed");
-            println!("child committed 200 rows via stock");
-            store.close().ok();
-            loop {
-                std::thread::sleep(std::time::Duration::from_millis(100));
+                        Ok(())
+                    })
+                    .expect("append during kill window");
+                next += 1;
             }
         }
+        other => panic!("unknown backend {other}"),
     }
 }
 
-#[cfg(feature = "turso")]
-use hermes_rs::persistence::TursoBackend;
+fn append_acknowledged_burst(store: &impl SessionStore, session: &str) {
+    store
+        .write(Patience::TRANSCRIPT, &mut |tx: &mut dyn WriteTxn| {
+            for i in 0..200u64 {
+                tx.append_message(
+                    session,
+                    &AppendMessage {
+                        role: "user".into(),
+                        content: Some(format!("child burst {i}")),
+                        ..Default::default()
+                    },
+                )?;
+            }
+            Ok(())
+        })
+        .expect("commit acknowledged 200-row burst");
+}
+
+fn publish_ready(path: &str) {
+    std::fs::write(path, b"committed-200").expect("publish readiness sentinel");
+}
