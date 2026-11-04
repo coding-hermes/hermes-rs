@@ -502,3 +502,74 @@ descending-id defect (id 73 below 396) — inherited, not introduced here.
 Nothing was created: 0 tags local, 0 tags on origin, 0 Release objects, no
 artifact published, `Cargo.lock` and every source file untouched. There is
 nothing to roll back. `git tag | wc -l` = 0 after this pass as before it.
+
+## Addendum — third delivery of the same tick id (verification pass, not a new sweep)
+
+`hermes-rs-releng-2026-11-04-15-35-32` was delivered a third time. Pass 1
+landed as `527f8ba`; pass 2 verified it as `c99dea7` and closed as its own
+carrier `e1c1e63`. The tip served to this pass is that same carrier, so there
+is no advanced code tree to re-gate. This section records only what this pass
+measured that the earlier two did not, and nothing is restated.
+
+| Probe (this pass, at the served tip) | Result |
+|---|---|
+| `git rev-parse HEAD` / `git ls-remote origin refs/heads/main` / `gh api commits/main` | all three agree on `e1c1e632c666b271b04314b5b2692538ff15628c` |
+| Parity `git rev-list --left-right --count origin/main...HEAD` | `0  0`, working tree clean |
+| Exact-SHA hosted CI | run `41870729422` — `status=completed`, `conclusion=success`, single job *Project contracts and board integrity*, every step success |
+| `scripts/release.sh --dry-run` in a fresh detached worktree at the served tip | **rc=0**, full plan resolved; `git tag` 0 and `git status --porcelain` empty afterwards |
+| Release surface | `tags_local=0 tags_remote=0 releases=0`, unchanged |
+
+The carrier's own run is the new receipt: pass 2 cited CI on its candidate
+`c888bd8` (run `41869553562`) and could not yet cite a conclusion for its own
+carrier commit. `git diff --name-only c888bd8..e1c1e63` is
+`.coding-hermes/board/{tasks,events,board}.jsonl` plus this evidence file, so
+the carrier adds no build input.
+
+### The one owner-scoped question, narrowed by measurement
+
+Pass 1 escalated a single question — the first artifact and distribution
+channel — on the assumption that a never-tagged repository might also be a
+never-published channel. The namespace census settles the second half:
+
+| Repo under `coding-hermes` | tags | releases |
+|---|---|---|
+| scheduler | 26 | 26 |
+| boardctl | 13 | 13 |
+| coding-hermes-tools | 3 | 3 |
+| hermes-canopy | 3 | 1 |
+| auger | 2 | 2 |
+| **hermes-rs** | **0** | **0** |
+
+GitHub Releases is an established channel for this owner, so only this
+repository's first Release object is new. The question is therefore narrower
+than it was filed: not "may this lane use this forge for the first time", but
+"the first published Release for hermes-rs". It changes nothing about the
+decision below, because the cut is refused by evidence the repository itself
+requires, not by the channel question.
+
+### Decision, unchanged
+
+**NO CUT — Decision 1 rule R2 with Decision 1b.** Unchanged and re-confirmed
+at the served tip: `specs/ROADMAP.md` Gate 8 gates releases on compatibility
+evidence and clean-machine installation, and `HRS-127` (P1, pending) records
+that the paired AC-2/AC-9 comparative run has never executed while
+`DF-HRS-123` owns the blocked fresh-machine install leg. Both rows are open
+and both carry their own remedy, so no new row is filed by this pass and the
+board is left untouched (47 rows: 39 complete, 8 pending). No tag was created,
+no Release object published, no dependency moved.
+
+Legs closed by this pass:
+
+- **Durable memory.** `/releng/hermes-rs/2026-11-04/hermes-rs-releng-2026-11-04-15-35-32-pass3`
+  in namespace `hermes-rs`, record id `7e95c5c0-20ec-4d99-9123-38b4ab13981a`; read back by
+  exact key (id and content match) and independently by id-grep of
+  `~/duckbrain/namespaces/hermes-rs/event/2026-11/month current.jsonl` (1 match).
+- **Delivery.** The two earlier passes recorded a delivery target but left no
+  send receipt anywhere in the tree, so the message was never posted. This pass
+  sent the decision to `telegram:-1003310984808:223570` through `hermes send`
+  and the transport returned `message_id 245659` (chat id `-1003310984808` is
+  the supergroup component, as expected on a threaded target).
+
+The lane's cooldown is 86400 s, so the next releng tick — not another
+re-delivery of this id — is the boundary at which a silence default could be
+taken for the channel question, and even then the Gate 8 blocker decides.
