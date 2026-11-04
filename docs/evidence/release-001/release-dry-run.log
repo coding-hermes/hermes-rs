@@ -1,0 +1,170 @@
+### RELEASE-001 evidence — release driver dry run (verbatim output)
+### ch:trace RELEASE-001 | spec=specs/COMPATIBILITY_MATRIX.md | evidence=docs/evidence/release-001/
+### repository: /home/kara/hermes-rs
+### started_utc: 2026-11-04T16:12:05Z
+### precondition: the working tree must be clean and no tag may exist
+
+$ git status --porcelain --untracked-files=normal ; echo "rc=$?"
+(no output above means the tree is clean)
+rc=0
+
+[assert] git status --porcelain is empty as expected: OK
+
+$ git tag | wc -l ; echo "rc=$?"
+0
+rc=0
+
+[assert] git tag count (zero tags) is 0 as expected: OK
+
+$ scripts/release.sh --dry-run ; echo "rc=$?"
+hermes-rs release driver — DRY RUN
+
+Nothing is created by this run: no tag, no commit, and no file inside the
+repository. The CHANGELOG transform below is exercised into a temporary
+directory and discarded. No artifact is built.
+
+Repository facts
+  repository         : /home/kara/hermes-rs
+  version (manifest) : 0.1.0   (Cargo.toml [package] version)
+  version (lock)     : 0.1.0   (matches the manifest)
+  tag                : v0.1.0
+  branch             : main
+  working tree       : clean
+  tag locally        : absent
+  already released   : no dated section for 0.1.0
+  host target        : x86_64-unknown-linux-gnu (rustc 1.98.0)
+  release date stamp : 2026-11-04 (UTC, evaluated at cut time)
+  [Unreleased] lines : 58
+
+Plan — a real cut (--confirm-readiness <row>) runs exactly these steps,
+in this order, and stops at the first refusal or failure:
+  0. refuse unless: tree clean, HEAD on main, tag v0.1.0 absent locally and
+     on origin, no dated CHANGELOG section for 0.1.0, [Unreleased]
+     non-empty, --confirm-readiness names the readiness row that returned GO
+  1. version stamp    verify Cargo.toml [package] version == Cargo.lock
+                      ('0.1.0'); the driver never invents a version bump
+  2. gates            cargo fmt --all -- --check
+                      cargo clippy --workspace --all-targets --all-features -- -D warnings
+                      cargo test --workspace --all-features
+  3. artifacts        cargo build --release --locked --target x86_64-unknown-linux-gnu
+                        --bin hermes-rs --bin hermes-rs-session-adapter
+                      -> target/release-artifacts/v0.1.0/hermes-rs-v0.1.0-x86_64-unknown-linux-gnu
+                      -> target/release-artifacts/v0.1.0/hermes-rs-session-adapter-v0.1.0-x86_64-unknown-linux-gnu
+  4. CHANGELOG        write the dated section shown below into CHANGELOG.md,
+                      leaving an empty [Unreleased] at the top
+  5. release notes    target/release-artifacts/v0.1.0/RELEASE-NOTES-v0.1.0.md
+                      (generated from the same [Unreleased] body)
+  6. SHA256SUMS       target/release-artifacts/v0.1.0/SHA256SUMS
+                        <sha256>  hermes-rs-v0.1.0-x86_64-unknown-linux-gnu
+                        <sha256>  hermes-rs-session-adapter-v0.1.0-x86_64-unknown-linux-gnu
+                      hashes are computed at cut time from the built
+                      binaries; no hash is known or shown before the build
+  7. commit           git add -- CHANGELOG.md && git commit
+                      subject: 'release: v0.1.0'
+  8. tag              git tag -a v0.1.0 -m 'hermes-rs v0.1.0'   (local only)
+
+Not in the plan: no push, no GitHub Release, no artifact upload. Pushing
+v0.1.0 is what runs .github/workflows/release.yml (x86_64 + aarch64 builds,
+SHA256SUMS, Release object). See docs/releases.md.
+
+CHANGELOG section a cut would write (verbatim):
+---8<---
+## [0.1.0] - 2026-11-04
+
+### Added
+
+- Foundation scaffold and Rust workspace (Gate 4, HRS-008): a Cargo workspace
+  with a pinned toolchain, the `hermes-rs` CLI binary, the `hermes_rs` library,
+  non-vacuous tests, and an active Rust CI gate (format, lint, tests).
+- Active CI gates (`.github/workflows/ci.yml`, `rust-ci.yml`,
+  `release-parity.yml`): project-contract and board-integrity checks, Rust
+  format/lint/test, and an upstream-parity fixture gate that publishes nothing.
+- Persistence boundary and the first vertical slice (Gate 3 HRS-002, Gate 5
+  HRS-010): `specs/persistence-shim.md` and a stock-SQLite session store behind
+  an engine-neutral shim, covering the specification's §6.1 operations (open,
+  ensure, append, get, search, end, usage) with verbatim upstream DDL,
+  reconciliation, journal resolution, backup-API snapshots, quarantine
+  admission, and an error taxonomy. Scope is deliberately narrower than
+  Hermes: rotation, leases, outbox and the crash window are not implemented and
+  are recorded as such in the parity report.
+- Python interoperability boundary (Gate 6, HRS-003):
+  `hermes-rs-session-adapter`, a newline-delimited JSON-RPC server over stdio
+  (protocol `hermes-rs/session-adapter/1`) driven from a standard-library
+  CPython client, with a documented scope statement and rejected alternatives
+  in `specs/python-interop.md`.
+- Upstream release tracking (HRS-004): `scripts/track_upstream_release.sh`,
+  per-release snapshots under `docs/upstream-releases/`, a deterministically
+  regenerated parity report, and a parity ledger.
+- Optional backend evaluation (Gate 7, HRS-009): the `turso` Cargo feature and
+  a parity battery/benchmark harness. Evaluation result at turso 0.8.3: **not
+  adopted** — files containing FTS5 break its engine, so it cannot open real
+  Hermes databases; stock SQLite remains the only default and the feature stays
+  off by default. No speed claim is made.
+- Measurement harness (HRS-005, HRS-006): scaffold and measured capture
+  scripts with environment metadata and per-field null reasons, plus the
+  recorded Python baseline profiles under `baseline/`.
+- Release surface (RELEASE-001): `scripts/release.sh` (the release driver),
+  this changelog, a tag-triggered publish workflow
+  (`.github/workflows/release.yml`) that cross-compiles the two binaries for
+  `x86_64-unknown-linux-gnu` and `aarch64-unknown-linux-gnu`, emits
+  `SHA256SUMS`, and publishes a GitHub Release, plus the operator procedure in
+  `docs/releases.md`. Adding the surface cut no release: no tag exists and none
+  was created.
+
+### Changed
+
+- The Rust crate's `bundled` SQLite feature pins the amalgamation so file-format
+  behavior does not drift with the host's libsqlite3.
+- The SIGKILL crash-window tests for the session store were made to exercise a
+  real crash window rather than a vacuous one.
+
+### Fixed
+
+- Documented `session_model_usage` column order is checked against the DDL by
+  `scripts/check-project-artifacts.py`, so prose cannot drift from the schema.
+- The usage skill's claims about board rows are checked against the board by
+  `scripts/check_skill_claims.py`, with recorded negative controls.
+- Skipped tests (for example when the `sqlite3` CLI is absent) report a reason
+  instead of failing silently.
+
+### Known gaps
+
+- The paired upstream-harness comparative run required by the compatibility
+  spec's AC-2 and AC-9 has not been executed; the corresponding compatibility
+  matrix row is `Untriaged`, so no parity claim follows from this file.
+- No install, upgrade, or rollback implementation exists (the matrix row is
+  `Untriaged`); the repository installs from a source checkout only.
+- Every subsystem other than persistence remains "Pending Rust implementation"
+  in `specs/COMPATIBILITY_MATRIX.md`.
+---8<---
+
+Path checks exercised by this dry run (temporary files only)
+  changelog transform : ok — dated heading for 0.1.0 present,
+                        [Unreleased] kept, 79 non-blank lines,
+                        sha256 of the rendered preview: 83e23441fb01ffc4097925f0ffa20b5f584f8fa6e8e0812a24eea154fcda7d81
+                        (preview discarded; CHANGELOG.md is unchanged)
+  manifest format     : ok — 2 lines matching '<sha256>  <artifact-name>'
+                        (format check on synthetic zero-byte inputs; these are
+                        not artifact hashes and prove nothing about a build)
+  worktree unchanged  : clean (git status --porcelain)
+
+DRY RUN COMPLETE — nothing was created. rc=0
+rc=0
+
+[assert] dry run: rc=0 as expected: OK
+
+### postcondition: the dry run created nothing
+
+$ git tag | wc -l ; echo "rc=$?"
+0
+rc=0
+
+[assert] git tag count after the dry run is 0 as expected: OK
+
+$ git status --porcelain --untracked-files=normal ; echo "rc=$?"
+(no output above means the tree is unchanged)
+rc=0
+
+[assert] git status --porcelain after the dry run is empty as expected: OK
+
+### finished_utc: 2026-11-04T16:12:05Z

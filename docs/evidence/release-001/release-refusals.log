@@ -1,0 +1,110 @@
+### RELEASE-001 evidence — release driver refusal paths (verbatim output)
+### ch:trace RELEASE-001 | spec=specs/COMPATIBILITY_MATRIX.md | evidence=docs/evidence/release-001/
+### repository: /home/kara/hermes-rs
+### started_utc: 2026-11-04T16:12:05Z
+### Every refusal below is expected to exit 2 with an explicit message and
+### to leave no commit and no tag behind. The repository must end with
+### ZERO tags.
+
+### precondition
+
+$ git status --porcelain --untracked-files=normal ; echo "rc=$?"
+(no output above means the tree is clean)
+rc=0
+
+[assert] git status --porcelain is empty as expected: OK
+
+$ git tag | wc -l ; echo "rc=$?"
+0
+rc=0
+
+[assert] git tag count is 0 as expected: OK
+
+### refusal 1 of 3 — dirty working tree
+
+$ touch .release-refusal-probe ; echo "rc=$?"
+rc=0
+
+$ git status --porcelain --untracked-files=normal ; echo "rc=$?"
+?? .release-refusal-probe
+rc=0
+
+$ scripts/release.sh ; echo "rc=$?"
+release.sh: REFUSED: the working tree is dirty — commit or stash every tracked and untracked change first (git status --porcelain is not empty)
+rc=2
+
+[assert] dirty-tree refusal: rc=2 as expected: OK
+
+$ rm -f .release-refusal-probe ; echo "rc=$?"
+rc=0
+
+$ git status --porcelain --untracked-files=normal ; echo "rc=$?"
+(no output above means the probe is gone and the tree is clean again)
+rc=0
+
+[assert] git status --porcelain after removing the probe is empty as expected: OK
+
+### refusal 2 of 3 — the target tag already exists locally
+### (a temporary tag is created for this probe and deleted immediately after)
+
+$ git tag v0.1.0 ; echo "rc=$?"
+rc=0
+
+$ git tag -l 'v*' ; echo "rc=$?"
+v0.1.0
+rc=0
+
+$ scripts/release.sh ; echo "rc=$?"
+release.sh: REFUSED: tag v0.1.0 already exists locally — delete or re-point it deliberately before cutting
+rc=2
+
+[assert] existing-tag refusal: rc=2 as expected: OK
+
+$ git tag -d v0.1.0 ; echo "rc=$?"
+Deleted tag 'v0.1.0' (was 3cb146d)
+rc=0
+
+$ git tag | wc -l ; echo "rc=$?"
+0
+rc=0
+
+[assert] git tag count after deleting the probe tag is 0 as expected: OK
+
+### refusal 3 of 3 — clean tree, current 0.1.0 stamp, no readiness row named
+### (the documented behaviour of a bare invocation: refuse, never a silent no-op)
+
+$ git status --porcelain --untracked-files=normal ; echo "rc=$?"
+(no output above means the tree is clean)
+rc=0
+
+[assert] git status --porcelain is empty as expected: OK
+
+$ scripts/release.sh ; echo "rc=$?"
+release.sh: REFUSED: a real cut requires --confirm-readiness <row>, naming the readiness sweep row that returned GO — this driver cannot decide readiness for you
+rc=2
+
+[assert] missing-readiness refusal: rc=2 as expected: OK
+
+### final state — nothing was created and nothing was tagged
+
+$ git tag | wc -l ; echo "rc=$?"
+0
+rc=0
+
+[assert] git tag count (must be 0) is 0 as expected: OK
+
+$ git ls-remote --tags origin ; echo "rc=$?"
+rc=0
+
+[assert] origin tag list is empty as expected: OK
+
+[assert] HEAD is unchanged by the refusals (id compared before and after): OK
+
+$ git status --porcelain --untracked-files=normal ; echo "rc=$?"
+(no output above means the tree is clean)
+rc=0
+
+[assert] git status --porcelain is empty as expected: OK
+
+### assertion failures: 0
+### finished_utc: 2026-11-04T16:12:08Z

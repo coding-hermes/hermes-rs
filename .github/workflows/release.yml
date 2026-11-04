@@ -1,0 +1,257 @@
+name: Release
+
+# Tag-triggered publish path. Ordinary pushes to main never run this workflow:
+# the only `push` trigger is on refs/tags/v*. `workflow_dispatch` replays a
+# publish for a tag that already exists (same build, same checks, same output).
+#
+# hermes-rs is an independent Rust project. This workflow publishes binaries and
+# checksums; it makes no compatibility or performance claim. Toolchain: the
+# stable Rust channel selected by rust-toolchain.toml, with the two targets
+# below installed. SQLite is statically linked into the binaries through
+# rusqlite's `bundled` feature; libc is the target's glibc (the -gnu targets are
+# already available in the target listing, so no musl rebuild is attempted and
+# no fully-static artifact is claimed).
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to (re)publish, for example v0.1.0'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Resolve and validate the release tag
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+      version: ${{ steps.resolve.outputs.version }}
+    steps:
+      - name: Resolve the target tag
+        id: resolve
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          tag="${INPUT_TAG:-$GITHUB_REF_NAME}"
+          if ! printf '%s' "$tag" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::release tag '$tag' must look like vX.Y.Z"
+            exit 1
+          fi
+          printf 'tag=%s\n' "$tag" >> "$GITHUB_OUTPUT"
+          printf 'version=%s\n' "${tag#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Check out the tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.resolve.outputs.tag }}
+          fetch-depth: 0
+
+      - name: The tag must be a main-line commit
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "::error::$(git rev-parse HEAD) is not an ancestor of origin/main; releases are cut from main only"
+            exit 1
+          fi
+
+      - name: The tag must match the manifest version
+        env:
+          VERSION: ${{ steps.resolve.outputs.version }}
+        run: |
+          set -euo pipefail
+          manifest="$(awk '
+            /^\[package\]$/ { in_package = 1; next }
+            /^\[/ { in_package = 0 }
+            in_package && $1 == "version" { v = $3; gsub(/"/, "", v); print v; exit }
+          ' Cargo.toml)"
+          if [ "$manifest" != "$VERSION" ]; then
+            echo "::error::tag version '$VERSION' does not match Cargo.toml [package] version '$manifest'"
+            exit 1
+          fi
+          echo "manifest version $manifest matches $GITHUB_REF"
+
+      - name: The CHANGELOG must carry a dated section for this version
+        env:
+          VERSION: ${{ steps.resolve.outputs.version }}
+        run: |
+          set -euo pipefail
+          escaped="${VERSION//./\\.}"
+          if ! grep -Eq "^## \[${escaped}\] - [0-9]{4}-[0-9]{2}-[0-9]{2}$" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no dated section for $VERSION; cut the release with scripts/release.sh (see docs/releases.md)"
+            exit 1
+          fi
+          echo "CHANGELOG.md carries a dated section for $VERSION"
+
+  build:
+    name: Build ${{ matrix.target }}
+    needs: prepare
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - x86_64-unknown-linux-gnu
+          - aarch64-unknown-linux-gnu
+    steps:
+      - name: Check out the tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install the aarch64 cross C toolchain
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gcc-aarch64-linux-gnu
+
+      - name: Build both binaries
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+          CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
+          AR_aarch64_unknown_linux_gnu: aarch64-linux-gnu-ar
+        run: |
+          set -euo pipefail
+          cargo build --release --locked --target ${{ matrix.target }} \
+            --bin hermes-rs --bin hermes-rs-session-adapter
+
+      - name: Name the artifacts
+        env:
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          for bin in hermes-rs hermes-rs-session-adapter; do
+            src="target/${{ matrix.target }}/release/$bin"
+            test -x "$src" || { echo "::error::missing build output $src"; exit 1; }
+            cp -- "$src" "dist/${bin}-${RELEASE_TAG}-${{ matrix.target }}"
+          done
+          file dist/*
+
+      - name: Smoke-run the binaries (host target only)
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        env:
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          set -euo pipefail
+          cli="dist/hermes-rs-${RELEASE_TAG}-${{ matrix.target }}"
+          adapter="dist/hermes-rs-session-adapter-${RELEASE_TAG}-${{ matrix.target }}"
+          cli_out="$("$cli" --version)"
+          echo "$cli_out"
+          if [ "$cli_out" != "hermes-rs $VERSION" ]; then
+            echo "::error::'$cli --version' printed '$cli_out', expected 'hermes-rs $VERSION'"
+            exit 1
+          fi
+          adapter_out="$("$adapter" --protocol)"
+          echo "$adapter_out"
+          if [ "$adapter_out" != "hermes-rs/session-adapter/1" ]; then
+            echo "::error::adapter protocol banner mismatch: '$adapter_out'"
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.target }}
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    name: Publish the GitHub Release
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Check every expected artifact is present
+        env:
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for target in x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu; do
+            for bin in hermes-rs hermes-rs-session-adapter; do
+              f="dist/${bin}-${RELEASE_TAG}-${target}"
+              if [ -f "$f" ]; then
+                echo "present: $f"
+              else
+                echo "::error::missing artifact: $f"
+                missing=1
+              fi
+            done
+          done
+          [ "$missing" -eq 0 ] || exit 1
+
+      - name: Generate and verify SHA256SUMS
+        run: |
+          set -euo pipefail
+          cd dist
+          binaries=(hermes-rs-*)
+          if [ "${#binaries[@]}" -ne 4 ]; then
+            echo "::error::expected 4 binaries, found ${#binaries[@]}"
+            exit 1
+          fi
+          sha256sum "${binaries[@]}" > SHA256SUMS
+          sha256sum -c SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Build the release body from the CHANGELOG section
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          set -euo pipefail
+          {
+            printf '> hermes-rs is an independent Rust project. It is not an official\n'
+            printf '> Nous Research release and it is not a drop-in replacement for\n'
+            printf '> Hermes Agent. No compatibility or performance claim is made beyond\n'
+            printf '> the committed evidence in docs/evidence/.\n'
+            printf '>\n'
+            printf '> Verify the downloads: sha256sum -c SHA256SUMS.\n\n'
+            awk -v heading="## [${VERSION}] - " '
+              index($0, heading) == 1 { inside = 1; next }
+              inside && /^## \[/ { exit }
+              inside { print }
+            ' CHANGELOG.md
+          } > RELEASE-NOTES.md
+          if [ "$(grep -c . RELEASE-NOTES.md)" -lt 5 ]; then
+            echo "::error::the release body is empty; refusing to publish"
+            exit 1
+          fi
+
+      - name: Publish the release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare.outputs.tag }}
+          name: hermes-rs ${{ needs.prepare.outputs.tag }}
+          body_path: RELEASE-NOTES.md
+          generate_release_notes: false
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: true
+          files: |
+            dist/hermes-rs-*
+            dist/SHA256SUMS
