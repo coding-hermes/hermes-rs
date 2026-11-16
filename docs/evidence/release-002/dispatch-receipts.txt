@@ -12,29 +12,29 @@
 https://github.com/coding-hermes/hermes-rs/actions/runs/43935640646
 44240780e56016ac3e8f7663ad72300a1cfb2eaf
 success
-Resolve and validate the release ref	success	
-Build aarch64-unknown-linux-gnu	success	
-Build x86_64-unknown-linux-gnu	success	
-Verify release artifacts	success	
-Publish the GitHub Release	skipped	
+Resolve and validate the release ref	success
+Build aarch64-unknown-linux-gnu	success
+Build x86_64-unknown-linux-gnu	success
+Verify release artifacts	success
+Publish the GitHub Release	skipped
 
 ## gh run view 43935679198 --json jobs (name / conclusion / failing steps)
 https://github.com/coding-hermes/hermes-rs/actions/runs/43935679198
 44240780e56016ac3e8f7663ad72300a1cfb2eaf
 failure
 Resolve and validate the release ref	failure	The requested version must match the manifest version
-Build ${{ matrix.target }}	skipped	
-Verify release artifacts	skipped	
-Publish the GitHub Release	skipped	
+Build ${{ matrix.target }}	skipped
+Verify release artifacts	skipped
+Publish the GitHub Release	skipped
 
 ## gh run view 43935717716 --json jobs (name / conclusion / failing steps)
 https://github.com/coding-hermes/hermes-rs/actions/runs/43935717716
 44240780e56016ac3e8f7663ad72300a1cfb2eaf
 failure
 Resolve and validate the release ref	failure	Require the dated CHANGELOG section unless this is a rehearsal
-Build ${{ matrix.target }}	skipped	
-Verify release artifacts	skipped	
-Publish the GitHub Release	skipped	
+Build ${{ matrix.target }}	skipped
+Verify release artifacts	skipped
+Publish the GitHub Release	skipped
 
 ## green run 43935640646 — artifact presence, checksum verification, host smoke
 Name the artifacts	2026-11-16T19:07:05.9281749Z dist/hermes-rs-session-adapter-v0.1.0-aarch64-unknown-linux-gnu: ELF 64-bit LSB pie executable, ARM aarch64, version 1 (SYSV), dynamically linked, inter
