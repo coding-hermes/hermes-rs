@@ -32,7 +32,7 @@ for the same reason.
 |---|---|
 | `scripts/release.sh` | The release driver: preconditions, gates, artifact build, `SHA256SUMS`, CHANGELOG stamp, local commit and local tag. Never pushes. |
 | `CHANGELOG.md` | Keep-a-Changelog file. `## [Unreleased]` at the top; the driver writes `## [<version>] - <YYYY-MM-DD>` at cut time. |
-| `.github/workflows/release.yml` | Publishes: runs **only** on `push` of a `v*` tag or on `workflow_dispatch` with an existing tag. Cross-compiles both binaries for `x86_64-unknown-linux-gnu` and `aarch64-unknown-linux-gnu`, writes `SHA256SUMS`, verifies it, and creates the GitHub Release. |
+| `.github/workflows/release.yml` | Publishes on a `v*` tag push or a non-dry `workflow_dispatch` with an existing tag; a dry dispatch builds and verifies artifacts without publishing. Cross-compiles both binaries for `x86_64-unknown-linux-gnu` and `aarch64-unknown-linux-gnu`, writes `SHA256SUMS`, verifies it, and creates the GitHub Release only on the publish path. |
 | `docs/evidence/release-001/` | The real, captured evidence for the driver: a dry run and the refusal paths. |
 
 The workflow does not run on ordinary pushes to `main` — the only `push`
@@ -122,7 +122,13 @@ Pushing the tag is what publishes. `release.yml` then:
 7. creates the GitHub Release with all four binaries plus `SHA256SUMS`.
 
 Replaying a publish without re-cutting: `workflow_dispatch` with the existing
-tag as the `tag` input — same checks, same output.
+tag as the `tag` input and `dry_run` false — same checks, same output. For a
+build-only rehearsal, leave `tag` empty, provide `version` as `0.1.0` or
+`v0.1.0`, and set `dry_run` true; this checks out the dispatched commit, builds
+both targets, verifies the four named artifacts and uploads `SHA256SUMS`, but
+never publishes. `rehearse_undated_changelog` is honoured only with `dry_run`
+true: it waives exactly the dated CHANGELOG section check and emits a warning;
+its default is false and it cannot waive that check on a publish path.
 
 ### Artifact names
 

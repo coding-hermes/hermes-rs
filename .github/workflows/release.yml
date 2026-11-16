@@ -1,8 +1,8 @@
 name: Release
 
-# Tag-triggered publish path. Ordinary pushes to main never run this workflow:
-# the only `push` trigger is on refs/tags/v*. `workflow_dispatch` replays a
-# publish for a tag that already exists (same build, same checks, same output).
+# The two entry points are deliberately different: a v* tag push publishes;
+# workflow_dispatch either republishes an existing tag or runs a build-only
+# rehearsal that publishes nothing.
 #
 # hermes-rs is an independent Rust project. This workflow publishes binaries and
 # checksums; it makes no compatibility or performance claim. Toolchain: the
@@ -19,46 +19,121 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Existing tag to (re)publish, for example v0.1.0'
-        required: true
+        description: 'Existing tag to (re)publish; leave empty for a build-only run'
+        required: false
         type: string
+      version:
+        description: 'Version for a build-only run, for example 0.1.0 or v0.1.0'
+        required: false
+        type: string
+      dry_run:
+        description: 'Build and verify only; never publish'
+        required: false
+        default: false
+        type: boolean
+      rehearse_undated_changelog:
+        description: 'In dry_run only, waive the dated CHANGELOG section check'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
 
 concurrency:
-  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  group: release-${{ github.event_name == 'workflow_dispatch' && (inputs.tag || inputs.version || github.sha) || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
   prepare:
-    name: Resolve and validate the release tag
+    name: Resolve and validate the release ref
     runs-on: ubuntu-latest
     outputs:
+      ref: ${{ steps.resolve.outputs.ref }}
       tag: ${{ steps.resolve.outputs.tag }}
       version: ${{ steps.resolve.outputs.version }}
+      dry_run: ${{ steps.resolve.outputs.dry_run }}
     steps:
-      - name: Resolve the target tag
+      - name: Resolve the target ref and version
         id: resolve
         env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_REF_NAME: ${{ github.ref_name }}
+          EVENT_SHA: ${{ github.sha }}
           INPUT_TAG: ${{ inputs.tag }}
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
         run: |
           set -euo pipefail
-          tag="${INPUT_TAG:-$GITHUB_REF_NAME}"
+          dry_run=false
+          if [ "$EVENT_NAME" = workflow_dispatch ]; then
+            dry_run="${INPUT_DRY_RUN:-false}"
+          fi
+
+          if [ "$EVENT_NAME" = push ]; then
+            tag="$EVENT_REF_NAME"
+            version="${tag#v}"
+            ref="$tag"
+          elif [ "$dry_run" = true ]; then
+            if [ -n "${INPUT_TAG:-}" ]; then
+              tag="$INPUT_TAG"
+              version="${tag#v}"
+              if [ -n "${INPUT_VERSION:-}" ]; then
+                requested="${INPUT_VERSION#v}"
+                [ "$requested" = "$version" ] || {
+                  echo "::error::requested version '$requested' does not match requested tag version '$version'"
+                  exit 1
+                }
+              fi
+            else
+              version="${INPUT_VERSION:-}"
+              version="${version#v}"
+              [ -n "$version" ] || {
+                echo "::error::version is required when tag is empty"
+                exit 1
+              }
+              tag="v$version"
+            fi
+            ref="$EVENT_SHA"
+          else
+            [ -n "${INPUT_TAG:-}" ] || {
+              echo "::error::publish dispatch requires an existing tag; use dry_run for a build-only run"
+              exit 1
+            }
+            tag="$INPUT_TAG"
+            version="${tag#v}"
+            if [ -n "${INPUT_VERSION:-}" ]; then
+              requested="${INPUT_VERSION#v}"
+              [ "$requested" = "$version" ] || {
+                echo "::error::requested version '$requested' does not match requested tag version '$version'"
+                exit 1
+              }
+            fi
+            ref="$tag"
+          fi
+
           if ! printf '%s' "$tag" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
             echo "::error::release tag '$tag' must look like vX.Y.Z"
             exit 1
           fi
-          printf 'tag=%s\n' "$tag" >> "$GITHUB_OUTPUT"
-          printf 'version=%s\n' "${tag#v}" >> "$GITHUB_OUTPUT"
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::requested version '$version' must look like X.Y.Z"
+            exit 1
+          fi
+          {
+            printf 'ref=%s\n' "$ref"
+            printf 'tag=%s\n' "$tag"
+            printf 'version=%s\n' "$version"
+            printf 'dry_run=%s\n' "$dry_run"
+          } >> "$GITHUB_OUTPUT"
 
-      - name: Check out the tag
+      - name: Check out the resolved ref
         uses: actions/checkout@v4
         with:
-          ref: ${{ steps.resolve.outputs.tag }}
+          ref: ${{ steps.resolve.outputs.ref }}
           fetch-depth: 0
 
-      - name: The tag must be a main-line commit
+      - name: The checked-out commit must be a main-line commit
         run: |
           set -euo pipefail
           git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
@@ -67,7 +142,7 @@ jobs:
             exit 1
           fi
 
-      - name: The tag must match the manifest version
+      - name: The requested version must match the manifest version
         env:
           VERSION: ${{ steps.resolve.outputs.version }}
         run: |
@@ -78,22 +153,38 @@ jobs:
             in_package && $1 == "version" { v = $3; gsub(/"/, "", v); print v; exit }
           ' Cargo.toml)"
           if [ "$manifest" != "$VERSION" ]; then
-            echo "::error::tag version '$VERSION' does not match Cargo.toml [package] version '$manifest'"
+            echo "::error::requested version '$VERSION' does not match Cargo.toml [package] version '$manifest'"
             exit 1
           fi
-          echo "manifest version $manifest matches $GITHUB_REF"
+          echo "manifest version $manifest matches requested version $VERSION"
 
-      - name: The CHANGELOG must carry a dated section for this version
+      - name: Require the dated CHANGELOG section unless this is a rehearsal
         env:
           VERSION: ${{ steps.resolve.outputs.version }}
+          DRY_RUN: ${{ steps.resolve.outputs.dry_run }}
+          REHEARSE_UNDATED_CHANGELOG: ${{ inputs.rehearse_undated_changelog }}
         run: |
           set -euo pipefail
           escaped="${VERSION//./\\.}"
-          if ! grep -Eq "^## \[${escaped}\] - [0-9]{4}-[0-9]{2}-[0-9]{2}$" CHANGELOG.md; then
+          if grep -Eq "^## \[${escaped}\] - [0-9]{4}-[0-9]{2}-[0-9]{2}$" CHANGELOG.md; then
+            echo "CHANGELOG.md carries a dated section for $VERSION"
+          elif [ "$DRY_RUN" = true ] && [ "$REHEARSE_UNDATED_CHANGELOG" = true ]; then
+            echo "::warning::waived exactly the dated CHANGELOG section requirement for $VERSION during this build-only rehearsal"
+          else
             echo "::error::CHANGELOG.md has no dated section for $VERSION; cut the release with scripts/release.sh (see docs/releases.md)"
             exit 1
           fi
-          echo "CHANGELOG.md carries a dated section for $VERSION"
+
+      - name: The dispatched publish tag must exist on origin
+        if: github.event_name == 'workflow_dispatch' && inputs.dry_run != true
+        env:
+          RELEASE_TAG: ${{ steps.resolve.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if ! git ls-remote --exit-code --refs origin "refs/tags/$RELEASE_TAG" >/dev/null; then
+            echo "::error::publish tag '$RELEASE_TAG' does not exist on origin"
+            exit 1
+          fi
 
   build:
     name: Build ${{ matrix.target }}
@@ -106,10 +197,10 @@ jobs:
           - x86_64-unknown-linux-gnu
           - aarch64-unknown-linux-gnu
     steps:
-      - name: Check out the tag
+      - name: Check out the resolved ref
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.prepare.outputs.tag }}
+          ref: ${{ needs.prepare.outputs.ref }}
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -172,31 +263,27 @@ jobs:
           path: dist/*
           if-no-files-found: error
 
-  publish:
-    name: Publish the GitHub Release
+  verify:
+    name: Verify release artifacts
     needs: [prepare, build]
     runs-on: ubuntu-latest
     steps:
-      - name: Check out the tag
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.prepare.outputs.tag }}
-
       - uses: actions/download-artifact@v4
         with:
           path: dist
-          merge-multiple: true
-
-      - name: Check every expected artifact is present
+      - name: Check every expected artifact and verify checksums
         env:
           RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
         run: |
           set -euo pipefail
+          mkdir -p assembled
           missing=0
           for target in x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu; do
             for bin in hermes-rs hermes-rs-session-adapter; do
-              f="dist/${bin}-${RELEASE_TAG}-${target}"
-              if [ -f "$f" ]; then
+              f="${bin}-${RELEASE_TAG}-${target}"
+              source="dist/release-${target}/$f"
+              if [ -f "$source" ]; then
+                cp -- "$source" assembled/"$f"
                 echo "present: $f"
               else
                 echo "::error::missing artifact: $f"
@@ -205,19 +292,31 @@ jobs:
             done
           done
           [ "$missing" -eq 0 ] || exit 1
-
-      - name: Generate and verify SHA256SUMS
-        run: |
-          set -euo pipefail
-          cd dist
-          binaries=(hermes-rs-*)
-          if [ "${#binaries[@]}" -ne 4 ]; then
-            echo "::error::expected 4 binaries, found ${#binaries[@]}"
-            exit 1
-          fi
-          sha256sum "${binaries[@]}" > SHA256SUMS
+          cd assembled
+          sha256sum hermes-rs-* > SHA256SUMS
           sha256sum -c SHA256SUMS
           cat SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-SHA256SUMS
+          path: assembled/SHA256SUMS
+          if-no-files-found: error
+
+  publish:
+    name: Publish the GitHub Release
+    needs: [prepare, build, verify]
+    if: needs.prepare.outputs.dry_run != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
 
       - name: Build the release body from the CHANGELOG section
         env:
