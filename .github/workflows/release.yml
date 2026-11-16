@@ -210,7 +210,13 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends gcc-aarch64-linux-gnu
+          # libc6-dev-arm64-cross is only a Recommends of gcc-aarch64-linux-gnu,
+          # so --no-install-recommends drops it and the cross gcc then falls back
+          # to the host headers: the bundled-SQLite C build dies on
+          # /usr/include/stdint.h -> bits/libc-header-start.h missing. It is
+          # named explicitly for that reason.
+          sudo apt-get install -y --no-install-recommends \
+            gcc-aarch64-linux-gnu libc6-dev-arm64-cross
 
       - name: Build both binaries
         env:
