@@ -1,0 +1,71 @@
+# RELEASE-002 hosted receipts — captured 2026-11-16T19:09:23Z
+# head: 44240780e56016ac3e8f7663ad72300a1cfb2eaf
+
+## gh run list --workflow release.yml --limit 5
+43935717716	44240780e56016ac3e8f7663ad72300a1cfb2eaf	completed	failure	2026-11-16T19:05:49Z	workflow_dispatch
+43935679198	44240780e56016ac3e8f7663ad72300a1cfb2eaf	completed	failure	2026-11-16T19:05:36Z	workflow_dispatch
+43935640646	44240780e56016ac3e8f7663ad72300a1cfb2eaf	completed	success	2026-11-16T19:05:23Z	workflow_dispatch
+43933503561	38e5b8da16e55890a8780109018d1bfbd9070fbf	completed	failure	2026-11-16T18:53:07Z	workflow_dispatch
+43933420805	38e5b8da16e55890a8780109018d1bfbd9070fbf	completed	failure	2026-11-16T18:52:39Z	workflow_dispatch
+
+## gh run view 43935640646 --json jobs (name / conclusion / failing steps)
+https://github.com/coding-hermes/hermes-rs/actions/runs/43935640646
+44240780e56016ac3e8f7663ad72300a1cfb2eaf
+success
+Resolve and validate the release ref	success	
+Build aarch64-unknown-linux-gnu	success	
+Build x86_64-unknown-linux-gnu	success	
+Verify release artifacts	success	
+Publish the GitHub Release	skipped	
+
+## gh run view 43935679198 --json jobs (name / conclusion / failing steps)
+https://github.com/coding-hermes/hermes-rs/actions/runs/43935679198
+44240780e56016ac3e8f7663ad72300a1cfb2eaf
+failure
+Resolve and validate the release ref	failure	The requested version must match the manifest version
+Build ${{ matrix.target }}	skipped	
+Verify release artifacts	skipped	
+Publish the GitHub Release	skipped	
+
+## gh run view 43935717716 --json jobs (name / conclusion / failing steps)
+https://github.com/coding-hermes/hermes-rs/actions/runs/43935717716
+44240780e56016ac3e8f7663ad72300a1cfb2eaf
+failure
+Resolve and validate the release ref	failure	Require the dated CHANGELOG section unless this is a rehearsal
+Build ${{ matrix.target }}	skipped	
+Verify release artifacts	skipped	
+Publish the GitHub Release	skipped	
+
+## green run 43935640646 — artifact presence, checksum verification, host smoke
+Name the artifacts	2026-11-16T19:07:05.9281749Z dist/hermes-rs-session-adapter-v0.1.0-aarch64-unknown-linux-gnu: ELF 64-bit LSB pie executable, ARM aarch64, version 1 (SYSV), dynamically linked, inter
+Name the artifacts	2026-11-16T19:07:05.9284172Z dist/hermes-rs-v0.1.0-aarch64-unknown-linux-gnu:                 ELF 64-bit LSB pie executable, ARM aarch64, version 1 (SYSV), dynamically linked, inter
+Name the artifacts	2026-11-16T19:06:52.0233671Z dist/hermes-rs-session-adapter-v0.1.0-x86_64-unknown-linux-gnu: ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter
+Name the artifacts	2026-11-16T19:06:52.0235794Z dist/hermes-rs-v0.1.0-x86_64-unknown-linux-gnu:                 ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter
+Smoke-run the binaries (host target only)	2026-11-16T19:06:52.0357907Z hermes-rs 0.1.0
+Smoke-run the binaries (host target only)	2026-11-16T19:06:52.0369166Z hermes-rs/session-adapter/1
+Check every expected artifact and verify checksums	2026-11-16T19:07:14.9388826Z [36;1m      echo "present: $f"[0m
+Check every expected artifact and verify checksums	2026-11-16T19:07:14.9390339Z [36;1msha256sum -c SHA256SUMS[0m
+Check every expected artifact and verify checksums	2026-11-16T19:07:14.9491586Z present: hermes-rs-v0.1.0-x86_64-unknown-linux-gnu
+Check every expected artifact and verify checksums	2026-11-16T19:07:14.9511674Z present: hermes-rs-session-adapter-v0.1.0-x86_64-unknown-linux-gnu
+Check every expected artifact and verify checksums	2026-11-16T19:07:14.9525277Z present: hermes-rs-v0.1.0-aarch64-unknown-linux-gnu
+Check every expected artifact and verify checksums	2026-11-16T19:07:14.9544230Z present: hermes-rs-session-adapter-v0.1.0-aarch64-unknown-linux-gnu
+Check every expected artifact and verify checksums	2026-11-16T19:07:14.9635041Z hermes-rs-session-adapter-v0.1.0-aarch64-unknown-linux-gnu: OK
+Check every expected artifact and verify checksums	2026-11-16T19:07:14.9651371Z hermes-rs-session-adapter-v0.1.0-x86_64-unknown-linux-gnu: OK
+Check every expected artifact and verify checksums	2026-11-16T19:07:14.9657113Z hermes-rs-v0.1.0-aarch64-unknown-linux-gnu: OK
+Check every expected artifact and verify checksums	2026-11-16T19:07:14.9662722Z hermes-rs-v0.1.0-x86_64-unknown-linux-gnu: OK
+
+## negative control 43935679198 — version vs Cargo.toml
+The requested version must match the manifest version	2026-11-16T19:05:43.8358385Z ##[error]requested version '9.9.9' does not match Cargo.toml [package] version '0.1.0'
+
+## negative control 43935717716 — dated CHANGELOG preflight
+Require the dated CHANGELOG section unless this is a rehearsal	2026-11-16T19:07:35.5358196Z ##[error]CHANGELOG.md has no dated section for 0.1.0; cut the release with scripts/release.sh (see docs/rele
+
+## post-run invariants
+git ls-remote --tags origin: []
+git tag -l: []
+gh release list: []
+
+## artifacts on the green run
+release-SHA256SUMS	369
+release-aarch64-unknown-linux-gnu	1834398
+release-x86_64-unknown-linux-gnu	1861123
